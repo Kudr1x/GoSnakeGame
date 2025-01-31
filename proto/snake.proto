@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package snake;
+
+option go_package = ".;snake";
+
+service SnakeGame {
+  rpc JoinGame (JoinRequest) returns (stream GameState);
+  rpc SendDirection (DirectionRequest) returns (Empty);
+}
+
+message JoinRequest {
+  string player_name = 1;
+}
+
+message DirectionRequest {
+  string player_name = 1;
+  Direction direction = 2;
+}
+
+message GameState {
+  repeated Player players = 1;
+  repeated Point food = 2;
+}
+
+message Player {
+  string name = 1;
+  repeated Point body = 2;
+  bool alive = 3;
+}
+
+message Point {
+  int32 x = 1;
+  int32 y = 2;
+}
+
+enum Direction {
+  UP = 0;
+  DOWN = 1;
+  LEFT = 2;
+  RIGHT = 3;
+}
+
+message Empty {}
