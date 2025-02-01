@@ -32,7 +32,8 @@ var (
 	currentState *pb.GameState
 	mu           sync.Mutex
 	currentDir   pb.Direction
-	mainWindow   fyne.Window // Сохраняем ссылку на главное окно
+	currentScore int
+	mainWindow   fyne.Window
 )
 
 func main() {
@@ -47,25 +48,15 @@ func main() {
 	mainWindow = a.NewWindow("Snake Game")
 
 	nameEntry := widget.NewEntry()
-	nameEntry.SetPlaceHolder("Введите ваше имя")
+	nameEntry.SetPlaceHolder("Enter your name")
 
-	joinButton := widget.NewButton("Присоединиться к игре", func() {
+	joinButton := widget.NewButton("Join the game", func() {
 		playerName = nameEntry.Text
 		if playerName == "" {
 			return
 		}
 
-		var err error
-		stream, err = client.JoinGame(context.Background(), &pb.JoinRequest{PlayerName: playerName})
-		if err != nil {
-			log.Printf("Не удалось присоединиться к игре: %v", err)
-			return
-		}
-
-		go receiveGameState()
-		go sendDirection()
-
-		mainWindow.SetContent(createGameUI())
+		joinGame()
 	})
 
 	mainWindow.SetContent(container.NewVBox(
@@ -112,6 +103,20 @@ func main() {
 	mainWindow.ShowAndRun()
 }
 
+func joinGame() {
+	var err error
+	stream, err = client.JoinGame(context.Background(), &pb.JoinRequest{PlayerName: playerName})
+	if err != nil {
+		log.Printf("Не удалось присоединиться к игре: %v", err)
+		return
+	}
+
+	go receiveGameState()
+	go sendDirection()
+
+	mainWindow.SetContent(createGameUI())
+}
+
 func createGameUI() fyne.CanvasObject {
 	gameContainer := container.NewWithoutLayout()
 	objects := make(map[string]fyne.CanvasObject)
@@ -122,9 +127,15 @@ func createGameUI() fyne.CanvasObject {
 	board.Move(fyne.NewPos(0, 0))
 	gameContainer.Add(board)
 
+	scopeLabel := widget.NewLabel(fmt.Sprintf("Score %d", 10))
+	scopeLabel.Resize(fyne.NewSize(100, 100))
+	scopeLabel.Move(fyne.NewPos(width*cellSize, 0))
+	gameContainer.Add(scopeLabel)
+
 	go func() {
 		for {
 			mu.Lock()
+
 			if currentState != nil {
 				currentFood := make(map[string]bool)
 				for _, food := range currentState.Food {
@@ -157,6 +168,8 @@ func createGameUI() fyne.CanvasObject {
 					snakeColor := color.RGBA{R: 0, G: 0, B: 255, A: 255}
 					if player.Name == playerName {
 						snakeColor = color.RGBA{R: 0, G: 255, B: 0, A: 255}
+						currentScore = len(player.Body) * 10
+						scopeLabel.SetText(fmt.Sprintf("Score: %d", currentScore))
 					}
 
 					for i, bodyPart := range player.Body {
@@ -218,15 +231,15 @@ func sendDirection() {
 
 func showGameOverScreen() {
 	dialog.ShowCustomConfirm(
-		"Игра окончена",
-		"Перезапустить",
-		"Выход",
+		"Game over",
+		"Reboot",
+		"Exit",
 		container.NewVBox(
-			widget.NewLabel("Игра окончена!"),
+			widget.NewLabel(fmt.Sprintf("Your score %d", currentScore)),
 		),
 		func(restart bool) {
 			if restart {
-				//todo доделать
+				joinGame()
 			} else {
 				mainWindow.Close()
 			}

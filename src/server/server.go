@@ -87,16 +87,15 @@ func (s *gameServer) SendDirection(ctx context.Context, req *pb.DirectionRequest
 func (s *gameServer) updateGame() {
 	for {
 		s.mu.Lock()
-		for name, player := range s.players {
+		for _, player := range s.players {
 			if !player.alive {
-				delete(s.players, name)
-				log.Printf("Игрок %s удален из игры", player.name)
 				continue
 			}
 
 			newHead := s.getNewHead(player)
 			if newHead == nil || s.checkCollision(newHead, player) {
 				player.alive = false
+				player.body = nil
 				log.Printf("Игрок %s умер", player.name)
 				continue
 			}
@@ -110,7 +109,7 @@ func (s *gameServer) updateGame() {
 		}
 		s.mu.Unlock()
 
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(150 * time.Millisecond)
 	}
 }
 
