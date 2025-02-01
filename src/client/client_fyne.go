@@ -47,6 +47,7 @@ func main() {
 
 	a := app.New()
 	mainWindow = a.NewWindow("Snake Game")
+	mainWindow.SetFixedSize(true)
 
 	nameEntry := widget.NewEntry()
 	nameEntry.SetPlaceHolder("Enter your name")
@@ -100,7 +101,10 @@ func main() {
 		dirCh <- currentDir
 	})
 
-	mainWindow.Resize(fyne.NewSize(width*cellSize+150, height*cellSize))
+	mainWindow.Resize(fyne.NewSize(
+		width*cellSize+150,
+		height*cellSize),
+	)
 	mainWindow.ShowAndRun()
 }
 
@@ -151,7 +155,8 @@ func createGameUI() fyne.CanvasObject {
 
 				for key := range prevFood {
 					if !currentFood[key] {
-						if obj, exists := objects[key]; exists {
+						obj, exists := objects[key]
+						if exists {
 							gameContainer.Remove(obj)
 							delete(objects, key)
 						}
@@ -182,7 +187,8 @@ func createGameUI() fyne.CanvasObject {
 
 					for i, bodyPart := range player.Body {
 						key := fmt.Sprintf("snake-%s-%d", player.Name, i)
-						if obj, exists := objects[key]; exists {
+						obj, exists := objects[key]
+						if exists {
 							obj.Move(fyne.NewPos(float32(bodyPart.X)*cellSize, float32(bodyPart.Y)*cellSize))
 						} else {
 							bodyRect := canvas.NewRectangle(snakeColor)

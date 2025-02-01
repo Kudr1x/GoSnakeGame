@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"math"
 	"math/rand"
@@ -56,8 +55,6 @@ func (s *gameServer) GetTopPlayers(ctx context.Context, req *pb.Empty) (*pb.TopP
 		}
 		return playerScores[i].Score > playerScores[j].Score
 	})
-
-	fmt.Println(playerScores)
 
 	if len(playerScores) > 10 {
 		playerScores = playerScores[:10]
@@ -140,7 +137,6 @@ func (s *gameServer) updateGame() {
 	for {
 		s.mu.Lock()
 		for _, player := range s.players {
-			fmt.Println(player.bestScore, len(player.body)*10)
 			player.bestScore = int(math.Max(float64(player.bestScore), float64(len(player.body)*10)))
 
 			if !player.alive {
