@@ -21,6 +21,7 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	SnakeGame_JoinGame_FullMethodName      = "/snake.SnakeGame/JoinGame"
 	SnakeGame_SendDirection_FullMethodName = "/snake.SnakeGame/SendDirection"
+	SnakeGame_GetTopPlayers_FullMethodName = "/snake.SnakeGame/GetTopPlayers"
 )
 
 // SnakeGameClient is the client API for SnakeGame service.
@@ -29,6 +30,7 @@ const (
 type SnakeGameClient interface {
 	JoinGame(ctx context.Context, in *JoinRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GameState], error)
 	SendDirection(ctx context.Context, in *DirectionRequest, opts ...grpc.CallOption) (*Empty, error)
+	GetTopPlayers(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*TopPlayersResponse, error)
 }
 
 type snakeGameClient struct {
@@ -68,12 +70,23 @@ func (c *snakeGameClient) SendDirection(ctx context.Context, in *DirectionReques
 	return out, nil
 }
 
+func (c *snakeGameClient) GetTopPlayers(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*TopPlayersResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(TopPlayersResponse)
+	err := c.cc.Invoke(ctx, SnakeGame_GetTopPlayers_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SnakeGameServer is the server API for SnakeGame service.
 // All implementations must embed UnimplementedSnakeGameServer
 // for forward compatibility.
 type SnakeGameServer interface {
 	JoinGame(*JoinRequest, grpc.ServerStreamingServer[GameState]) error
 	SendDirection(context.Context, *DirectionRequest) (*Empty, error)
+	GetTopPlayers(context.Context, *Empty) (*TopPlayersResponse, error)
 	mustEmbedUnimplementedSnakeGameServer()
 }
 
@@ -89,6 +102,9 @@ func (UnimplementedSnakeGameServer) JoinGame(*JoinRequest, grpc.ServerStreamingS
 }
 func (UnimplementedSnakeGameServer) SendDirection(context.Context, *DirectionRequest) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SendDirection not implemented")
+}
+func (UnimplementedSnakeGameServer) GetTopPlayers(context.Context, *Empty) (*TopPlayersResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetTopPlayers not implemented")
 }
 func (UnimplementedSnakeGameServer) mustEmbedUnimplementedSnakeGameServer() {}
 func (UnimplementedSnakeGameServer) testEmbeddedByValue()                   {}
@@ -140,6 +156,24 @@ func _SnakeGame_SendDirection_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SnakeGame_GetTopPlayers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SnakeGameServer).GetTopPlayers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SnakeGame_GetTopPlayers_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SnakeGameServer).GetTopPlayers(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // SnakeGame_ServiceDesc is the grpc.ServiceDesc for SnakeGame service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -150,6 +184,10 @@ var SnakeGame_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SendDirection",
 			Handler:    _SnakeGame_SendDirection_Handler,
+		},
+		{
+			MethodName: "GetTopPlayers",
+			Handler:    _SnakeGame_GetTopPlayers_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

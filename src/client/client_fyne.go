@@ -6,6 +6,7 @@ import (
 	"fyne.io/fyne/v2/dialog"
 	"image/color"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -132,6 +133,11 @@ func createGameUI() fyne.CanvasObject {
 	scopeLabel.Move(fyne.NewPos(width*cellSize, 0))
 	gameContainer.Add(scopeLabel)
 
+	topPlayersLabel := widget.NewLabel(fmt.Sprintf(getStringTop()))
+	topPlayersLabel.Resize(fyne.NewSize(100, height*cellSize-100))
+	topPlayersLabel.Move(fyne.NewPos(width*cellSize, 100))
+	gameContainer.Add(topPlayersLabel)
+
 	go func() {
 		for {
 			mu.Lock()
@@ -164,6 +170,8 @@ func createGameUI() fyne.CanvasObject {
 					}
 				}
 
+				topPlayersLabel.SetText(getStringTop())
+
 				for _, player := range currentState.Players {
 					snakeColor := color.RGBA{R: 0, G: 0, B: 255, A: 255}
 					if player.Name == playerName {
@@ -195,6 +203,17 @@ func createGameUI() fyne.CanvasObject {
 	return gameContainer
 }
 
+func getStringTop() string {
+	topPlayers, _ := client.GetTopPlayers(context.Background(), &pb.Empty{})
+
+	var playerList []string
+	for _, player := range topPlayers.TopPlayers {
+		playerList = append(playerList, fmt.Sprintf("%s: %d", player.PlayerName, player.Score))
+	}
+
+	return strings.Join(playerList, "\n")
+}
+
 func receiveGameState() {
 	for {
 		state, err := stream.Recv()
@@ -209,6 +228,7 @@ func receiveGameState() {
 
 		for _, player := range state.Players {
 			if player.Name == playerName && !player.Alive {
+				currentDir = pb.Direction_UP
 				log.Println("Змейка умерла")
 				showGameOverScreen()
 				return

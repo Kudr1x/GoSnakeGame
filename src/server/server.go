@@ -2,11 +2,14 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"math"
 	"math/rand"
 	"net"
 	"os"
 	"os/signal"
+	"sort"
 	"sync"
 	"syscall"
 	"time"
@@ -28,21 +31,70 @@ type gameServer struct {
 }
 
 type Player struct {
-	name  string
-	body  []*pb.Point
-	alive bool
-	dir   pb.Direction
+	name      string
+	body      []*pb.Point
+	alive     bool
+	dir       pb.Direction
+	bestScore int
+}
+
+func (s *gameServer) GetTopPlayers(ctx context.Context, req *pb.Empty) (*pb.TopPlayersResponse, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	var playerScores []*pb.PlayerScore
+	for _, player := range s.players {
+		playerScores = append(playerScores, &pb.PlayerScore{
+			PlayerName: player.name,
+			Score:      int32(player.bestScore),
+		})
+	}
+
+	sort.SliceStable(playerScores, func(i, j int) bool {
+		if playerScores[i].Score == playerScores[j].Score {
+			return playerScores[i].PlayerName < playerScores[j].PlayerName
+		}
+		return playerScores[i].Score > playerScores[j].Score
+	})
+
+	fmt.Println(playerScores)
+
+	if len(playerScores) > 10 {
+		playerScores = playerScores[:10]
+	}
+
+	return &pb.TopPlayersResponse{
+		TopPlayers: playerScores,
+	}, nil
 }
 
 func (s *gameServer) JoinGame(req *pb.JoinRequest, stream pb.SnakeGame_JoinGameServer) error {
 	s.mu.Lock()
-	player := &Player{
-		name:  req.PlayerName,
-		body:  []*pb.Point{{X: 10, Y: 10}},
-		alive: true,
-		dir:   pb.Direction_UP,
+
+	var rebootFlag bool
+	for _, player := range s.players {
+		if player.name == req.PlayerName {
+			rebootFlag = true
+		}
 	}
-	s.players[req.PlayerName] = player
+
+	var player *Player
+	if !rebootFlag {
+		player = &Player{
+			name:  req.PlayerName,
+			body:  []*pb.Point{{X: 10, Y: 10}},
+			alive: true,
+			dir:   pb.Direction_UP,
+		}
+
+		s.players[req.PlayerName] = player
+	} else {
+		player = s.players[req.PlayerName]
+		player.alive = true
+		player.dir = pb.Direction_UP
+		player.body = []*pb.Point{{X: 10, Y: 10}}
+	}
+
 	s.mu.Unlock()
 
 	for {
@@ -88,6 +140,9 @@ func (s *gameServer) updateGame() {
 	for {
 		s.mu.Lock()
 		for _, player := range s.players {
+			fmt.Println(player.bestScore, len(player.body)*10)
+			player.bestScore = int(math.Max(float64(player.bestScore), float64(len(player.body)*10)))
+
 			if !player.alive {
 				continue
 			}

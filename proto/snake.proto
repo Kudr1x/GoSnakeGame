@@ -7,6 +7,16 @@ option go_package = ".;snake";
 service SnakeGame {
   rpc JoinGame (JoinRequest) returns (stream GameState);
   rpc SendDirection (DirectionRequest) returns (Empty);
+  rpc GetTopPlayers (Empty) returns (TopPlayersResponse);
+}
+
+message TopPlayersResponse {
+  repeated PlayerScore top_players = 1;
+}
+
+message PlayerScore {
+  string player_name = 1;
+  int32 score = 2;
 }
 
 message JoinRequest {
