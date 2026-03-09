@@ -5,6 +5,7 @@ import (
 	"GoSnakeGame/internal/config"
 	"GoSnakeGame/internal/game"
 	"context"
+	"flag"
 	"fmt"
 	"log"
 	"net"
@@ -21,7 +22,7 @@ import (
 
 type gameServer struct {
 	pb.UnimplementedSnakeGameServiceServer
-	engine *game.Engine
+	engine Engine
 	cfg    *config.ServerConfig
 }
 
@@ -82,7 +83,7 @@ func (s *gameServer) gameLoop(p *game.PlayerInfo, stream pb.SnakeGameService_Joi
 				return fmt.Errorf("failed to send game state: %w", err)
 			}
 
-			if !p.Alive {
+			if !p.IsAlive() {
 				time.Sleep(s.cfg.DeathWaitTime)
 
 				return nil
@@ -100,7 +101,8 @@ func (s *gameServer) SendDirection(_ context.Context, req *pb.SendDirectionReque
 
 func main() {
 	cfg := config.DefaultServerConfig()
-	cfg.ParseFlags()
+	cfg.ParseFlags(flag.CommandLine)
+	flag.Parse()
 
 	lis, err := net.Listen("tcp", cfg.Addr)
 	if err != nil {

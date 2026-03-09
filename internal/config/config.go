@@ -52,11 +52,10 @@ func DefaultServerConfig() *ServerConfig {
 }
 
 // ParseFlags parses server flags.
-func (c *ServerConfig) ParseFlags() {
-	flag.StringVar(&c.Addr, "addr", c.Addr, "server address")
-	flag.IntVar(&c.Width, "width", c.Width, "game width")
-	flag.IntVar(&c.Height, "height", c.Height, "game height")
-	flag.Parse()
+func (c *ServerConfig) ParseFlags(fs *flag.FlagSet) {
+	fs.StringVar(&c.Addr, "addr", c.Addr, "server address")
+	fs.IntVar(&c.Width, "width", c.Width, "game width")
+	fs.IntVar(&c.Height, "height", c.Height, "game height")
 }
 
 // DefaultClientConfig returns the default client configuration.
@@ -79,7 +78,6 @@ func DefaultClientConfig() *ClientConfig {
 }
 
 // ParseFlags parses client flags.
-func (c *ClientConfig) ParseFlags() {
-	flag.StringVar(&c.ServerAddr, "server", c.ServerAddr, "server address")
-	flag.Parse()
+func (c *ClientConfig) ParseFlags(fs *flag.FlagSet) {
+	fs.StringVar(&c.ServerAddr, "server", c.ServerAddr, "server address")
 }

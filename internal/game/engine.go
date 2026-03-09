@@ -21,12 +21,93 @@ type Engine struct {
 
 // PlayerInfo stores the internal state of a player.
 type PlayerInfo struct {
+	mu        sync.RWMutex
 	Name      string
 	Body      []*pb.Point
 	Alive     bool
 	Dir       pb.Direction
 	BestScore int
 	SessionID int64
+}
+
+// IsAlive returns the alive status of the player.
+func (p *PlayerInfo) IsAlive() bool {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	return p.Alive
+}
+
+// SetAlive sets the alive status of the player.
+func (p *PlayerInfo) SetAlive(alive bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.Alive = alive
+}
+
+// GetDirection returns the direction of the player.
+func (p *PlayerInfo) GetDirection() pb.Direction {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	return p.Dir
+}
+
+// SetDirection sets the direction of the player.
+func (p *PlayerInfo) SetDirection(dir pb.Direction) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.Dir = dir
+}
+
+// GetBody returns a copy of the player's body.
+func (p *PlayerInfo) GetBody() []*pb.Point {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	bodyCopy := make([]*pb.Point, len(p.Body))
+	for i, pt := range p.Body {
+		bodyCopy[i] = &pb.Point{X: pt.X, Y: pt.Y}
+	}
+
+	return bodyCopy
+}
+
+// SetBody sets the body of the player.
+func (p *PlayerInfo) SetBody(body []*pb.Point) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.Body = body
+}
+
+// GetBestScore returns the best score of the player.
+func (p *PlayerInfo) GetBestScore() int {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	return p.BestScore
+}
+
+// SetBestScore sets the best score of the player.
+func (p *PlayerInfo) SetBestScore(score int) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.BestScore = score
+}
+
+// GetSessionID returns the session ID of the player.
+func (p *PlayerInfo) GetSessionID() int64 {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	return p.SessionID
+}
+
+// SetSessionID sets the session ID of the player.
+func (p *PlayerInfo) SetSessionID(id int64) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.SessionID = id
 }
 
 // NewEngine creates a new game engine.
@@ -56,10 +137,10 @@ func (e *Engine) AddOrUpdatePlayer(name string) *PlayerInfo {
 		}
 		e.players[name] = p
 	} else {
-		p.Alive = true
-		p.Dir = pb.Direction_DIRECTION_UP
-		p.Body = []*pb.Point{{X: 10, Y: 10}}
-		p.SessionID = sessionID
+		p.SetAlive(true)
+		p.SetDirection(pb.Direction_DIRECTION_UP)
+		p.SetBody([]*pb.Point{{X: 10, Y: 10}})
+		p.SetSessionID(sessionID)
 	}
 
 	return p
@@ -70,7 +151,7 @@ func (e *Engine) RemovePlayer(name string, sessionID int64) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	if p, ok := e.players[name]; ok && p.SessionID == sessionID {
+	if p, ok := e.players[name]; ok && p.GetSessionID() == sessionID {
 		delete(e.players, name)
 	}
 }
@@ -81,9 +162,9 @@ func (e *Engine) SetDirection(name string, dir pb.Direction) {
 	defer e.mu.Unlock()
 
 	p, ok := e.players[name]
-	if ok && p.Alive {
-		if e.isValidDirectionChange(p.Dir, dir) {
-			p.Dir = dir
+	if ok && p.IsAlive() {
+		if e.isValidDirectionChange(p.GetDirection(), dir) {
+			p.SetDirection(dir)
 		}
 	}
 }
@@ -117,16 +198,10 @@ func (e *Engine) GetSnapshot() *pb.JoinGameResponse {
 	copy(state.Food, e.food)
 
 	for _, p := range e.players {
-		bodyCopy := make([]*pb.Point, len(p.Body))
-
-		for i, pt := range p.Body {
-			bodyCopy[i] = &pb.Point{X: pt.X, Y: pt.Y}
-		}
-
 		state.Players = append(state.Players, &pb.Player{
 			Name:  p.Name,
-			Body:  bodyCopy,
-			Alive: p.Alive,
+			Body:  p.GetBody(),
+			Alive: p.IsAlive(),
 		})
 	}
 
@@ -143,7 +218,7 @@ func (e *Engine) GetTopPlayers() []*pb.PlayerScore {
 	for _, p := range e.players {
 		scores = append(scores, &pb.PlayerScore{
 			PlayerName: p.Name,
-			Score:      int32(p.BestScore), // #nosec G115
+			Score:      int32(p.GetBestScore()), // #nosec G115 - score is unlikely to overflow int32
 		})
 	}
 
@@ -165,16 +240,16 @@ func (e *Engine) update(onPlayerDie func(name string)) {
 	defer e.mu.Unlock()
 
 	for _, p := range e.players {
-		if !p.Alive {
+		if !p.IsAlive() {
 			continue
 		}
 
-		p.BestScore = int(math.Max(float64(p.BestScore), float64(len(p.Body)*e.cfg.ScoreMultiplier)))
+		p.SetBestScore(int(math.Max(float64(p.GetBestScore()), float64(len(p.GetBody())*e.cfg.ScoreMultiplier))))
 
 		newHead := e.getNewHead(p)
 
 		if newHead == nil || e.checkCollision(newHead, p) {
-			p.Alive = false
+			p.SetAlive(false)
 
 			if onPlayerDie != nil {
 				onPlayerDie(p.Name)
@@ -183,26 +258,29 @@ func (e *Engine) update(onPlayerDie func(name string)) {
 			continue
 		}
 
-		p.Body = append([]*pb.Point{newHead}, p.Body...)
+		body := p.GetBody()
+		p.SetBody(append([]*pb.Point{newHead}, body...))
 
 		if e.checkFood(newHead) {
 			e.generateFood()
 		} else {
-			p.Body = p.Body[:len(p.Body)-1]
+			body := p.GetBody()
+			p.SetBody(body[:len(body)-1])
 		}
 	}
 }
 
 func (e *Engine) getNewHead(p *PlayerInfo) *pb.Point {
-	if len(p.Body) == 0 {
+	body := p.GetBody()
+	if len(body) == 0 {
 		return nil
 	}
 
-	head := p.Body[0]
+	head := body[0]
 	newHead := &pb.Point{X: head.X, Y: head.Y}
 
 	//nolint:exhaustive // Only movement related directions are handled
-	switch p.Dir {
+	switch p.GetDirection() {
 	case pb.Direction_DIRECTION_UP:
 		newHead.Y--
 	case pb.Direction_DIRECTION_DOWN:
@@ -226,7 +304,7 @@ func (e *Engine) isOutOfBounds(pt *pb.Point) bool {
 }
 
 func (e *Engine) checkCollision(newHead *pb.Point, p *PlayerInfo) bool {
-	for _, bodyPart := range p.Body {
+	for _, bodyPart := range p.GetBody() {
 		if newHead.X == bodyPart.X && newHead.Y == bodyPart.Y {
 			return true
 		}
@@ -237,8 +315,8 @@ func (e *Engine) checkCollision(newHead *pb.Point, p *PlayerInfo) bool {
 
 func (e *Engine) checkOtherPlayersCollision(newHead *pb.Point, playerName string) bool {
 	for _, otherPlayer := range e.players {
-		if otherPlayer.Name != playerName && otherPlayer.Alive {
-			for _, bodyPart := range otherPlayer.Body {
+		if otherPlayer.Name != playerName && otherPlayer.IsAlive() {
+			for _, bodyPart := range otherPlayer.GetBody() {
 				if newHead.X == bodyPart.X && newHead.Y == bodyPart.Y {
 					return true
 				}
@@ -280,11 +358,11 @@ func (e *Engine) generateFood() {
 
 func (e *Engine) isCellOccupied(pt *pb.Point) bool {
 	for _, p := range e.players {
-		if !p.Alive {
+		if !p.IsAlive() {
 			continue
 		}
 
-		for _, bodyPart := range p.Body {
+		for _, bodyPart := range p.GetBody() {
 			if pt.X == bodyPart.X && pt.Y == bodyPart.Y {
 				return true
 			}

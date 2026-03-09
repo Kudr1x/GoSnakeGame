@@ -4,6 +4,7 @@ package main
 import (
 	"GoSnakeGame/internal/config"
 	"context"
+	"flag"
 	"fmt"
 	"image/color"
 	"log"
@@ -26,7 +27,7 @@ import (
 
 type gameClient struct {
 	playerName   string
-	client       pb.SnakeGameServiceClient
+	client       SnakeGameClient
 	stream       pb.SnakeGameService_JoinGameClient
 	dirCh        chan pb.Direction
 	currentState *pb.JoinGameResponse
@@ -41,11 +42,14 @@ type gameClient struct {
 	// UI object pool
 	rectPool []*canvas.Rectangle
 	active   []*canvas.Rectangle
+
+	gameOver func()
 }
 
 func main() {
 	cfg := config.DefaultClientConfig()
-	cfg.ParseFlags()
+	cfg.ParseFlags(flag.CommandLine)
+	flag.Parse()
 
 	conn, err := grpc.NewClient(cfg.ServerAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
@@ -64,6 +68,7 @@ func main() {
 		dirCh:  make(chan pb.Direction, 1),
 		cfg:    cfg,
 	}
+	gc.gameOver = gc.showGameOverScreen
 
 	a := app.New()
 	gc.mainWindow = a.NewWindow("Snake Game")
@@ -346,7 +351,7 @@ func (gc *gameClient) receiveGameState(stopCh chan struct{}) {
 
 			for _, p := range state.Players {
 				if p.Name == gc.playerName && !p.Alive {
-					gc.showGameOverScreen()
+					gc.gameOver()
 
 					return
 				}

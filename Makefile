@@ -39,6 +39,10 @@ run-client:
 clean:
 	rm -rf $(BIN_DIR)
 	@echo "ok"
+	
+test:
+	go test -v -race ./...
+	@echo "ok"
 
 help:
 	@echo "Usage:"
@@ -48,3 +52,4 @@ help:
 	@echo "  make run-server  - Run server using 'go run'"
 	@echo "  make run-client  - Run client using 'go run'"
 	@echo "  make clean       - Remove build artifacts"
+	@echo "  make test        - Run tests"
