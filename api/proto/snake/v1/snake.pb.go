@@ -21,6 +21,58 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type GameMode int32
+
+const (
+	GameMode_MODE_UNSPECIFIED GameMode = 0
+	GameMode_MODE_SOLO        GameMode = 1
+	GameMode_MODE_1V1         GameMode = 2
+	GameMode_MODE_FFA         GameMode = 3 // 1v1v1v1
+)
+
+// Enum value maps for GameMode.
+var (
+	GameMode_name = map[int32]string{
+		0: "MODE_UNSPECIFIED",
+		1: "MODE_SOLO",
+		2: "MODE_1V1",
+		3: "MODE_FFA",
+	}
+	GameMode_value = map[string]int32{
+		"MODE_UNSPECIFIED": 0,
+		"MODE_SOLO":        1,
+		"MODE_1V1":         2,
+		"MODE_FFA":         3,
+	}
+)
+
+func (x GameMode) Enum() *GameMode {
+	p := new(GameMode)
+	*p = x
+	return p
+}
+
+func (x GameMode) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (GameMode) Descriptor() protoreflect.EnumDescriptor {
+	return file_api_proto_snake_v1_snake_proto_enumTypes[0].Descriptor()
+}
+
+func (GameMode) Type() protoreflect.EnumType {
+	return &file_api_proto_snake_v1_snake_proto_enumTypes[0]
+}
+
+func (x GameMode) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use GameMode.Descriptor instead.
+func (GameMode) EnumDescriptor() ([]byte, []int) {
+	return file_api_proto_snake_v1_snake_proto_rawDescGZIP(), []int{0}
+}
+
 type Direction int32
 
 const (
@@ -60,11 +112,11 @@ func (x Direction) String() string {
 }
 
 func (Direction) Descriptor() protoreflect.EnumDescriptor {
-	return file_api_proto_snake_v1_snake_proto_enumTypes[0].Descriptor()
+	return file_api_proto_snake_v1_snake_proto_enumTypes[1].Descriptor()
 }
 
 func (Direction) Type() protoreflect.EnumType {
-	return &file_api_proto_snake_v1_snake_proto_enumTypes[0]
+	return &file_api_proto_snake_v1_snake_proto_enumTypes[1]
 }
 
 func (x Direction) Number() protoreflect.EnumNumber {
@@ -73,7 +125,7 @@ func (x Direction) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use Direction.Descriptor instead.
 func (Direction) EnumDescriptor() ([]byte, []int) {
-	return file_api_proto_snake_v1_snake_proto_rawDescGZIP(), []int{0}
+	return file_api_proto_snake_v1_snake_proto_rawDescGZIP(), []int{1}
 }
 
 type ClientMessage struct {
@@ -83,6 +135,7 @@ type ClientMessage struct {
 	//	*ClientMessage_Join
 	//	*ClientMessage_Direction
 	//	*ClientMessage_Top
+	//	*ClientMessage_CreateRoom
 	Payload       isClientMessage_Payload `protobuf_oneof:"payload"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -152,6 +205,15 @@ func (x *ClientMessage) GetTop() *GetTopPlayersRequest {
 	return nil
 }
 
+func (x *ClientMessage) GetCreateRoom() *CreateRoomRequest {
+	if x != nil {
+		if x, ok := x.Payload.(*ClientMessage_CreateRoom); ok {
+			return x.CreateRoom
+		}
+	}
+	return nil
+}
+
 type isClientMessage_Payload interface {
 	isClientMessage_Payload()
 }
@@ -168,11 +230,17 @@ type ClientMessage_Top struct {
 	Top *GetTopPlayersRequest `protobuf:"bytes,3,opt,name=top,proto3,oneof"`
 }
 
+type ClientMessage_CreateRoom struct {
+	CreateRoom *CreateRoomRequest `protobuf:"bytes,4,opt,name=create_room,json=createRoom,proto3,oneof"`
+}
+
 func (*ClientMessage_Join) isClientMessage_Payload() {}
 
 func (*ClientMessage_Direction) isClientMessage_Payload() {}
 
 func (*ClientMessage_Top) isClientMessage_Payload() {}
+
+func (*ClientMessage_CreateRoom) isClientMessage_Payload() {}
 
 type ServerMessage struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -180,6 +248,7 @@ type ServerMessage struct {
 	//
 	//	*ServerMessage_Update
 	//	*ServerMessage_Top
+	//	*ServerMessage_RoomCreated
 	Payload       isServerMessage_Payload `protobuf_oneof:"payload"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -240,6 +309,15 @@ func (x *ServerMessage) GetTop() *GetTopPlayersResponse {
 	return nil
 }
 
+func (x *ServerMessage) GetRoomCreated() *CreateRoomResponse {
+	if x != nil {
+		if x, ok := x.Payload.(*ServerMessage_RoomCreated); ok {
+			return x.RoomCreated
+		}
+	}
+	return nil
+}
+
 type isServerMessage_Payload interface {
 	isServerMessage_Payload()
 }
@@ -252,9 +330,119 @@ type ServerMessage_Top struct {
 	Top *GetTopPlayersResponse `protobuf:"bytes,2,opt,name=top,proto3,oneof"`
 }
 
+type ServerMessage_RoomCreated struct {
+	RoomCreated *CreateRoomResponse `protobuf:"bytes,3,opt,name=room_created,json=roomCreated,proto3,oneof"`
+}
+
 func (*ServerMessage_Update) isServerMessage_Payload() {}
 
 func (*ServerMessage_Top) isServerMessage_Payload() {}
+
+func (*ServerMessage_RoomCreated) isServerMessage_Payload() {}
+
+type CreateRoomRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PlayerName    string                 `protobuf:"bytes,1,opt,name=player_name,json=playerName,proto3" json:"player_name,omitempty"`
+	Mode          GameMode               `protobuf:"varint,2,opt,name=mode,proto3,enum=api.proto.snake.v1.GameMode" json:"mode,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateRoomRequest) Reset() {
+	*x = CreateRoomRequest{}
+	mi := &file_api_proto_snake_v1_snake_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateRoomRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateRoomRequest) ProtoMessage() {}
+
+func (x *CreateRoomRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_snake_v1_snake_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateRoomRequest.ProtoReflect.Descriptor instead.
+func (*CreateRoomRequest) Descriptor() ([]byte, []int) {
+	return file_api_proto_snake_v1_snake_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *CreateRoomRequest) GetPlayerName() string {
+	if x != nil {
+		return x.PlayerName
+	}
+	return ""
+}
+
+func (x *CreateRoomRequest) GetMode() GameMode {
+	if x != nil {
+		return x.Mode
+	}
+	return GameMode_MODE_UNSPECIFIED
+}
+
+type CreateRoomResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RoomId        string                 `protobuf:"bytes,1,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`
+	InviteLink    string                 `protobuf:"bytes,2,opt,name=invite_link,json=inviteLink,proto3" json:"invite_link,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateRoomResponse) Reset() {
+	*x = CreateRoomResponse{}
+	mi := &file_api_proto_snake_v1_snake_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateRoomResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateRoomResponse) ProtoMessage() {}
+
+func (x *CreateRoomResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_snake_v1_snake_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateRoomResponse.ProtoReflect.Descriptor instead.
+func (*CreateRoomResponse) Descriptor() ([]byte, []int) {
+	return file_api_proto_snake_v1_snake_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *CreateRoomResponse) GetRoomId() string {
+	if x != nil {
+		return x.RoomId
+	}
+	return ""
+}
+
+func (x *CreateRoomResponse) GetInviteLink() string {
+	if x != nil {
+		return x.InviteLink
+	}
+	return ""
+}
 
 type GetTopPlayersResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -265,7 +453,7 @@ type GetTopPlayersResponse struct {
 
 func (x *GetTopPlayersResponse) Reset() {
 	*x = GetTopPlayersResponse{}
-	mi := &file_api_proto_snake_v1_snake_proto_msgTypes[2]
+	mi := &file_api_proto_snake_v1_snake_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -277,7 +465,7 @@ func (x *GetTopPlayersResponse) String() string {
 func (*GetTopPlayersResponse) ProtoMessage() {}
 
 func (x *GetTopPlayersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_snake_v1_snake_proto_msgTypes[2]
+	mi := &file_api_proto_snake_v1_snake_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -290,7 +478,7 @@ func (x *GetTopPlayersResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTopPlayersResponse.ProtoReflect.Descriptor instead.
 func (*GetTopPlayersResponse) Descriptor() ([]byte, []int) {
-	return file_api_proto_snake_v1_snake_proto_rawDescGZIP(), []int{2}
+	return file_api_proto_snake_v1_snake_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *GetTopPlayersResponse) GetTopPlayers() []*PlayerScore {
@@ -310,7 +498,7 @@ type PlayerScore struct {
 
 func (x *PlayerScore) Reset() {
 	*x = PlayerScore{}
-	mi := &file_api_proto_snake_v1_snake_proto_msgTypes[3]
+	mi := &file_api_proto_snake_v1_snake_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -322,7 +510,7 @@ func (x *PlayerScore) String() string {
 func (*PlayerScore) ProtoMessage() {}
 
 func (x *PlayerScore) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_snake_v1_snake_proto_msgTypes[3]
+	mi := &file_api_proto_snake_v1_snake_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -335,7 +523,7 @@ func (x *PlayerScore) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PlayerScore.ProtoReflect.Descriptor instead.
 func (*PlayerScore) Descriptor() ([]byte, []int) {
-	return file_api_proto_snake_v1_snake_proto_rawDescGZIP(), []int{3}
+	return file_api_proto_snake_v1_snake_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *PlayerScore) GetPlayerName() string {
@@ -355,13 +543,14 @@ func (x *PlayerScore) GetScore() int32 {
 type JoinGameRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	PlayerName    string                 `protobuf:"bytes,1,opt,name=player_name,json=playerName,proto3" json:"player_name,omitempty"`
+	RoomId        string                 `protobuf:"bytes,2,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *JoinGameRequest) Reset() {
 	*x = JoinGameRequest{}
-	mi := &file_api_proto_snake_v1_snake_proto_msgTypes[4]
+	mi := &file_api_proto_snake_v1_snake_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -373,7 +562,7 @@ func (x *JoinGameRequest) String() string {
 func (*JoinGameRequest) ProtoMessage() {}
 
 func (x *JoinGameRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_snake_v1_snake_proto_msgTypes[4]
+	mi := &file_api_proto_snake_v1_snake_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -386,7 +575,7 @@ func (x *JoinGameRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use JoinGameRequest.ProtoReflect.Descriptor instead.
 func (*JoinGameRequest) Descriptor() ([]byte, []int) {
-	return file_api_proto_snake_v1_snake_proto_rawDescGZIP(), []int{4}
+	return file_api_proto_snake_v1_snake_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *JoinGameRequest) GetPlayerName() string {
@@ -396,17 +585,26 @@ func (x *JoinGameRequest) GetPlayerName() string {
 	return ""
 }
 
+func (x *JoinGameRequest) GetRoomId() string {
+	if x != nil {
+		return x.RoomId
+	}
+	return ""
+}
+
 type JoinGameResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Players       []*Player              `protobuf:"bytes,1,rep,name=players,proto3" json:"players,omitempty"`
 	Food          []*Point               `protobuf:"bytes,2,rep,name=food,proto3" json:"food,omitempty"`
+	RoomId        string                 `protobuf:"bytes,3,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`
+	Mode          GameMode               `protobuf:"varint,4,opt,name=mode,proto3,enum=api.proto.snake.v1.GameMode" json:"mode,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *JoinGameResponse) Reset() {
 	*x = JoinGameResponse{}
-	mi := &file_api_proto_snake_v1_snake_proto_msgTypes[5]
+	mi := &file_api_proto_snake_v1_snake_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -418,7 +616,7 @@ func (x *JoinGameResponse) String() string {
 func (*JoinGameResponse) ProtoMessage() {}
 
 func (x *JoinGameResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_snake_v1_snake_proto_msgTypes[5]
+	mi := &file_api_proto_snake_v1_snake_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -431,7 +629,7 @@ func (x *JoinGameResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use JoinGameResponse.ProtoReflect.Descriptor instead.
 func (*JoinGameResponse) Descriptor() ([]byte, []int) {
-	return file_api_proto_snake_v1_snake_proto_rawDescGZIP(), []int{5}
+	return file_api_proto_snake_v1_snake_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *JoinGameResponse) GetPlayers() []*Player {
@@ -448,17 +646,32 @@ func (x *JoinGameResponse) GetFood() []*Point {
 	return nil
 }
 
+func (x *JoinGameResponse) GetRoomId() string {
+	if x != nil {
+		return x.RoomId
+	}
+	return ""
+}
+
+func (x *JoinGameResponse) GetMode() GameMode {
+	if x != nil {
+		return x.Mode
+	}
+	return GameMode_MODE_UNSPECIFIED
+}
+
 type SendDirectionRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	PlayerName    string                 `protobuf:"bytes,1,opt,name=player_name,json=playerName,proto3" json:"player_name,omitempty"`
-	Direction     Direction              `protobuf:"varint,2,opt,name=direction,proto3,enum=api.proto.snake.v1.Direction" json:"direction,omitempty"`
+	RoomId        string                 `protobuf:"bytes,2,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`
+	Direction     Direction              `protobuf:"varint,3,opt,name=direction,proto3,enum=api.proto.snake.v1.Direction" json:"direction,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *SendDirectionRequest) Reset() {
 	*x = SendDirectionRequest{}
-	mi := &file_api_proto_snake_v1_snake_proto_msgTypes[6]
+	mi := &file_api_proto_snake_v1_snake_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -470,7 +683,7 @@ func (x *SendDirectionRequest) String() string {
 func (*SendDirectionRequest) ProtoMessage() {}
 
 func (x *SendDirectionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_snake_v1_snake_proto_msgTypes[6]
+	mi := &file_api_proto_snake_v1_snake_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -483,12 +696,19 @@ func (x *SendDirectionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SendDirectionRequest.ProtoReflect.Descriptor instead.
 func (*SendDirectionRequest) Descriptor() ([]byte, []int) {
-	return file_api_proto_snake_v1_snake_proto_rawDescGZIP(), []int{6}
+	return file_api_proto_snake_v1_snake_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *SendDirectionRequest) GetPlayerName() string {
 	if x != nil {
 		return x.PlayerName
+	}
+	return ""
+}
+
+func (x *SendDirectionRequest) GetRoomId() string {
+	if x != nil {
+		return x.RoomId
 	}
 	return ""
 }
@@ -508,7 +728,7 @@ type SendDirectionResponse struct {
 
 func (x *SendDirectionResponse) Reset() {
 	*x = SendDirectionResponse{}
-	mi := &file_api_proto_snake_v1_snake_proto_msgTypes[7]
+	mi := &file_api_proto_snake_v1_snake_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -520,7 +740,7 @@ func (x *SendDirectionResponse) String() string {
 func (*SendDirectionResponse) ProtoMessage() {}
 
 func (x *SendDirectionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_snake_v1_snake_proto_msgTypes[7]
+	mi := &file_api_proto_snake_v1_snake_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -533,7 +753,7 @@ func (x *SendDirectionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SendDirectionResponse.ProtoReflect.Descriptor instead.
 func (*SendDirectionResponse) Descriptor() ([]byte, []int) {
-	return file_api_proto_snake_v1_snake_proto_rawDescGZIP(), []int{7}
+	return file_api_proto_snake_v1_snake_proto_rawDescGZIP(), []int{9}
 }
 
 type GetTopPlayersRequest struct {
@@ -544,7 +764,7 @@ type GetTopPlayersRequest struct {
 
 func (x *GetTopPlayersRequest) Reset() {
 	*x = GetTopPlayersRequest{}
-	mi := &file_api_proto_snake_v1_snake_proto_msgTypes[8]
+	mi := &file_api_proto_snake_v1_snake_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -556,7 +776,7 @@ func (x *GetTopPlayersRequest) String() string {
 func (*GetTopPlayersRequest) ProtoMessage() {}
 
 func (x *GetTopPlayersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_snake_v1_snake_proto_msgTypes[8]
+	mi := &file_api_proto_snake_v1_snake_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -569,7 +789,7 @@ func (x *GetTopPlayersRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTopPlayersRequest.ProtoReflect.Descriptor instead.
 func (*GetTopPlayersRequest) Descriptor() ([]byte, []int) {
-	return file_api_proto_snake_v1_snake_proto_rawDescGZIP(), []int{8}
+	return file_api_proto_snake_v1_snake_proto_rawDescGZIP(), []int{10}
 }
 
 type Player struct {
@@ -585,7 +805,7 @@ type Player struct {
 
 func (x *Player) Reset() {
 	*x = Player{}
-	mi := &file_api_proto_snake_v1_snake_proto_msgTypes[9]
+	mi := &file_api_proto_snake_v1_snake_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -597,7 +817,7 @@ func (x *Player) String() string {
 func (*Player) ProtoMessage() {}
 
 func (x *Player) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_snake_v1_snake_proto_msgTypes[9]
+	mi := &file_api_proto_snake_v1_snake_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -610,7 +830,7 @@ func (x *Player) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Player.ProtoReflect.Descriptor instead.
 func (*Player) Descriptor() ([]byte, []int) {
-	return file_api_proto_snake_v1_snake_proto_rawDescGZIP(), []int{9}
+	return file_api_proto_snake_v1_snake_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *Player) GetName() string {
@@ -658,7 +878,7 @@ type Point struct {
 
 func (x *Point) Reset() {
 	*x = Point{}
-	mi := &file_api_proto_snake_v1_snake_proto_msgTypes[10]
+	mi := &file_api_proto_snake_v1_snake_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -670,7 +890,7 @@ func (x *Point) String() string {
 func (*Point) ProtoMessage() {}
 
 func (x *Point) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_snake_v1_snake_proto_msgTypes[10]
+	mi := &file_api_proto_snake_v1_snake_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -683,7 +903,7 @@ func (x *Point) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Point.ProtoReflect.Descriptor instead.
 func (*Point) Descriptor() ([]byte, []int) {
-	return file_api_proto_snake_v1_snake_proto_rawDescGZIP(), []int{10}
+	return file_api_proto_snake_v1_snake_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *Point) GetX() int32 {
@@ -704,33 +924,48 @@ var File_api_proto_snake_v1_snake_proto protoreflect.FileDescriptor
 
 const file_api_proto_snake_v1_snake_proto_rawDesc = "" +
 	"\n" +
-	"\x1eapi/proto/snake/v1/snake.proto\x12\x12api.proto.snake.v1\"\xdd\x01\n" +
+	"\x1eapi/proto/snake/v1/snake.proto\x12\x12api.proto.snake.v1\"\xa7\x02\n" +
 	"\rClientMessage\x129\n" +
 	"\x04join\x18\x01 \x01(\v2#.api.proto.snake.v1.JoinGameRequestH\x00R\x04join\x12H\n" +
 	"\tdirection\x18\x02 \x01(\v2(.api.proto.snake.v1.SendDirectionRequestH\x00R\tdirection\x12<\n" +
-	"\x03top\x18\x03 \x01(\v2(.api.proto.snake.v1.GetTopPlayersRequestH\x00R\x03topB\t\n" +
-	"\apayload\"\x99\x01\n" +
+	"\x03top\x18\x03 \x01(\v2(.api.proto.snake.v1.GetTopPlayersRequestH\x00R\x03top\x12H\n" +
+	"\vcreate_room\x18\x04 \x01(\v2%.api.proto.snake.v1.CreateRoomRequestH\x00R\n" +
+	"createRoomB\t\n" +
+	"\apayload\"\xe6\x01\n" +
 	"\rServerMessage\x12>\n" +
 	"\x06update\x18\x01 \x01(\v2$.api.proto.snake.v1.JoinGameResponseH\x00R\x06update\x12=\n" +
-	"\x03top\x18\x02 \x01(\v2).api.proto.snake.v1.GetTopPlayersResponseH\x00R\x03topB\t\n" +
-	"\apayload\"Y\n" +
+	"\x03top\x18\x02 \x01(\v2).api.proto.snake.v1.GetTopPlayersResponseH\x00R\x03top\x12K\n" +
+	"\froom_created\x18\x03 \x01(\v2&.api.proto.snake.v1.CreateRoomResponseH\x00R\vroomCreatedB\t\n" +
+	"\apayload\"f\n" +
+	"\x11CreateRoomRequest\x12\x1f\n" +
+	"\vplayer_name\x18\x01 \x01(\tR\n" +
+	"playerName\x120\n" +
+	"\x04mode\x18\x02 \x01(\x0e2\x1c.api.proto.snake.v1.GameModeR\x04mode\"N\n" +
+	"\x12CreateRoomResponse\x12\x17\n" +
+	"\aroom_id\x18\x01 \x01(\tR\x06roomId\x12\x1f\n" +
+	"\vinvite_link\x18\x02 \x01(\tR\n" +
+	"inviteLink\"Y\n" +
 	"\x15GetTopPlayersResponse\x12@\n" +
 	"\vtop_players\x18\x01 \x03(\v2\x1f.api.proto.snake.v1.PlayerScoreR\n" +
 	"topPlayers\"D\n" +
 	"\vPlayerScore\x12\x1f\n" +
 	"\vplayer_name\x18\x01 \x01(\tR\n" +
 	"playerName\x12\x14\n" +
-	"\x05score\x18\x02 \x01(\x05R\x05score\"2\n" +
+	"\x05score\x18\x02 \x01(\x05R\x05score\"K\n" +
 	"\x0fJoinGameRequest\x12\x1f\n" +
 	"\vplayer_name\x18\x01 \x01(\tR\n" +
-	"playerName\"w\n" +
+	"playerName\x12\x17\n" +
+	"\aroom_id\x18\x02 \x01(\tR\x06roomId\"\xc2\x01\n" +
 	"\x10JoinGameResponse\x124\n" +
 	"\aplayers\x18\x01 \x03(\v2\x1a.api.proto.snake.v1.PlayerR\aplayers\x12-\n" +
-	"\x04food\x18\x02 \x03(\v2\x19.api.proto.snake.v1.PointR\x04food\"t\n" +
+	"\x04food\x18\x02 \x03(\v2\x19.api.proto.snake.v1.PointR\x04food\x12\x17\n" +
+	"\aroom_id\x18\x03 \x01(\tR\x06roomId\x120\n" +
+	"\x04mode\x18\x04 \x01(\x0e2\x1c.api.proto.snake.v1.GameModeR\x04mode\"\x8d\x01\n" +
 	"\x14SendDirectionRequest\x12\x1f\n" +
 	"\vplayer_name\x18\x01 \x01(\tR\n" +
-	"playerName\x12;\n" +
-	"\tdirection\x18\x02 \x01(\x0e2\x1d.api.proto.snake.v1.DirectionR\tdirection\"\x17\n" +
+	"playerName\x12\x17\n" +
+	"\aroom_id\x18\x02 \x01(\tR\x06roomId\x12;\n" +
+	"\tdirection\x18\x03 \x01(\x0e2\x1d.api.proto.snake.v1.DirectionR\tdirection\"\x17\n" +
 	"\x15SendDirectionResponse\"\x16\n" +
 	"\x14GetTopPlayersRequest\"\xae\x01\n" +
 	"\x06Player\x12\x12\n" +
@@ -741,14 +976,21 @@ const file_api_proto_snake_v1_snake_proto_rawDesc = "" +
 	"\tdirection\x18\x05 \x01(\x0e2\x1d.api.proto.snake.v1.DirectionR\tdirection\"#\n" +
 	"\x05Point\x12\f\n" +
 	"\x01x\x18\x01 \x01(\x05R\x01x\x12\f\n" +
-	"\x01y\x18\x02 \x01(\x05R\x01y*u\n" +
+	"\x01y\x18\x02 \x01(\x05R\x01y*K\n" +
+	"\bGameMode\x12\x14\n" +
+	"\x10MODE_UNSPECIFIED\x10\x00\x12\r\n" +
+	"\tMODE_SOLO\x10\x01\x12\f\n" +
+	"\bMODE_1V1\x10\x02\x12\f\n" +
+	"\bMODE_FFA\x10\x03*u\n" +
 	"\tDirection\x12\x19\n" +
 	"\x15DIRECTION_UNSPECIFIED\x10\x00\x12\x10\n" +
 	"\fDIRECTION_UP\x10\x01\x12\x12\n" +
 	"\x0eDIRECTION_DOWN\x10\x02\x12\x12\n" +
 	"\x0eDIRECTION_LEFT\x10\x03\x12\x13\n" +
-	"\x0fDIRECTION_RIGHT\x10\x042\xb7\x02\n" +
-	"\x10SnakeGameService\x12W\n" +
+	"\x0fDIRECTION_RIGHT\x10\x042\x94\x03\n" +
+	"\x10SnakeGameService\x12[\n" +
+	"\n" +
+	"CreateRoom\x12%.api.proto.snake.v1.CreateRoomRequest\x1a&.api.proto.snake.v1.CreateRoomResponse\x12W\n" +
 	"\bJoinGame\x12#.api.proto.snake.v1.JoinGameRequest\x1a$.api.proto.snake.v1.JoinGameResponse0\x01\x12d\n" +
 	"\rSendDirection\x12(.api.proto.snake.v1.SendDirectionRequest\x1a).api.proto.snake.v1.SendDirectionResponse\x12d\n" +
 	"\rGetTopPlayers\x12(.api.proto.snake.v1.GetTopPlayersRequest\x1a).api.proto.snake.v1.GetTopPlayersResponseB&Z$GoSnakeGame/api/proto/snake/v1;snakeb\x06proto3"
@@ -765,45 +1007,54 @@ func file_api_proto_snake_v1_snake_proto_rawDescGZIP() []byte {
 	return file_api_proto_snake_v1_snake_proto_rawDescData
 }
 
-var file_api_proto_snake_v1_snake_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_api_proto_snake_v1_snake_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_api_proto_snake_v1_snake_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_api_proto_snake_v1_snake_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_api_proto_snake_v1_snake_proto_goTypes = []any{
-	(Direction)(0),                // 0: api.proto.snake.v1.Direction
-	(*ClientMessage)(nil),         // 1: api.proto.snake.v1.ClientMessage
-	(*ServerMessage)(nil),         // 2: api.proto.snake.v1.ServerMessage
-	(*GetTopPlayersResponse)(nil), // 3: api.proto.snake.v1.GetTopPlayersResponse
-	(*PlayerScore)(nil),           // 4: api.proto.snake.v1.PlayerScore
-	(*JoinGameRequest)(nil),       // 5: api.proto.snake.v1.JoinGameRequest
-	(*JoinGameResponse)(nil),      // 6: api.proto.snake.v1.JoinGameResponse
-	(*SendDirectionRequest)(nil),  // 7: api.proto.snake.v1.SendDirectionRequest
-	(*SendDirectionResponse)(nil), // 8: api.proto.snake.v1.SendDirectionResponse
-	(*GetTopPlayersRequest)(nil),  // 9: api.proto.snake.v1.GetTopPlayersRequest
-	(*Player)(nil),                // 10: api.proto.snake.v1.Player
-	(*Point)(nil),                 // 11: api.proto.snake.v1.Point
+	(GameMode)(0),                 // 0: api.proto.snake.v1.GameMode
+	(Direction)(0),                // 1: api.proto.snake.v1.Direction
+	(*ClientMessage)(nil),         // 2: api.proto.snake.v1.ClientMessage
+	(*ServerMessage)(nil),         // 3: api.proto.snake.v1.ServerMessage
+	(*CreateRoomRequest)(nil),     // 4: api.proto.snake.v1.CreateRoomRequest
+	(*CreateRoomResponse)(nil),    // 5: api.proto.snake.v1.CreateRoomResponse
+	(*GetTopPlayersResponse)(nil), // 6: api.proto.snake.v1.GetTopPlayersResponse
+	(*PlayerScore)(nil),           // 7: api.proto.snake.v1.PlayerScore
+	(*JoinGameRequest)(nil),       // 8: api.proto.snake.v1.JoinGameRequest
+	(*JoinGameResponse)(nil),      // 9: api.proto.snake.v1.JoinGameResponse
+	(*SendDirectionRequest)(nil),  // 10: api.proto.snake.v1.SendDirectionRequest
+	(*SendDirectionResponse)(nil), // 11: api.proto.snake.v1.SendDirectionResponse
+	(*GetTopPlayersRequest)(nil),  // 12: api.proto.snake.v1.GetTopPlayersRequest
+	(*Player)(nil),                // 13: api.proto.snake.v1.Player
+	(*Point)(nil),                 // 14: api.proto.snake.v1.Point
 }
 var file_api_proto_snake_v1_snake_proto_depIdxs = []int32{
-	5,  // 0: api.proto.snake.v1.ClientMessage.join:type_name -> api.proto.snake.v1.JoinGameRequest
-	7,  // 1: api.proto.snake.v1.ClientMessage.direction:type_name -> api.proto.snake.v1.SendDirectionRequest
-	9,  // 2: api.proto.snake.v1.ClientMessage.top:type_name -> api.proto.snake.v1.GetTopPlayersRequest
-	6,  // 3: api.proto.snake.v1.ServerMessage.update:type_name -> api.proto.snake.v1.JoinGameResponse
-	3,  // 4: api.proto.snake.v1.ServerMessage.top:type_name -> api.proto.snake.v1.GetTopPlayersResponse
-	4,  // 5: api.proto.snake.v1.GetTopPlayersResponse.top_players:type_name -> api.proto.snake.v1.PlayerScore
-	10, // 6: api.proto.snake.v1.JoinGameResponse.players:type_name -> api.proto.snake.v1.Player
-	11, // 7: api.proto.snake.v1.JoinGameResponse.food:type_name -> api.proto.snake.v1.Point
-	0,  // 8: api.proto.snake.v1.SendDirectionRequest.direction:type_name -> api.proto.snake.v1.Direction
-	11, // 9: api.proto.snake.v1.Player.body:type_name -> api.proto.snake.v1.Point
-	0,  // 10: api.proto.snake.v1.Player.direction:type_name -> api.proto.snake.v1.Direction
-	5,  // 11: api.proto.snake.v1.SnakeGameService.JoinGame:input_type -> api.proto.snake.v1.JoinGameRequest
-	7,  // 12: api.proto.snake.v1.SnakeGameService.SendDirection:input_type -> api.proto.snake.v1.SendDirectionRequest
-	9,  // 13: api.proto.snake.v1.SnakeGameService.GetTopPlayers:input_type -> api.proto.snake.v1.GetTopPlayersRequest
-	6,  // 14: api.proto.snake.v1.SnakeGameService.JoinGame:output_type -> api.proto.snake.v1.JoinGameResponse
-	8,  // 15: api.proto.snake.v1.SnakeGameService.SendDirection:output_type -> api.proto.snake.v1.SendDirectionResponse
-	3,  // 16: api.proto.snake.v1.SnakeGameService.GetTopPlayers:output_type -> api.proto.snake.v1.GetTopPlayersResponse
-	14, // [14:17] is the sub-list for method output_type
-	11, // [11:14] is the sub-list for method input_type
-	11, // [11:11] is the sub-list for extension type_name
-	11, // [11:11] is the sub-list for extension extendee
-	0,  // [0:11] is the sub-list for field type_name
+	8,  // 0: api.proto.snake.v1.ClientMessage.join:type_name -> api.proto.snake.v1.JoinGameRequest
+	10, // 1: api.proto.snake.v1.ClientMessage.direction:type_name -> api.proto.snake.v1.SendDirectionRequest
+	12, // 2: api.proto.snake.v1.ClientMessage.top:type_name -> api.proto.snake.v1.GetTopPlayersRequest
+	4,  // 3: api.proto.snake.v1.ClientMessage.create_room:type_name -> api.proto.snake.v1.CreateRoomRequest
+	9,  // 4: api.proto.snake.v1.ServerMessage.update:type_name -> api.proto.snake.v1.JoinGameResponse
+	6,  // 5: api.proto.snake.v1.ServerMessage.top:type_name -> api.proto.snake.v1.GetTopPlayersResponse
+	5,  // 6: api.proto.snake.v1.ServerMessage.room_created:type_name -> api.proto.snake.v1.CreateRoomResponse
+	0,  // 7: api.proto.snake.v1.CreateRoomRequest.mode:type_name -> api.proto.snake.v1.GameMode
+	7,  // 8: api.proto.snake.v1.GetTopPlayersResponse.top_players:type_name -> api.proto.snake.v1.PlayerScore
+	13, // 9: api.proto.snake.v1.JoinGameResponse.players:type_name -> api.proto.snake.v1.Player
+	14, // 10: api.proto.snake.v1.JoinGameResponse.food:type_name -> api.proto.snake.v1.Point
+	0,  // 11: api.proto.snake.v1.JoinGameResponse.mode:type_name -> api.proto.snake.v1.GameMode
+	1,  // 12: api.proto.snake.v1.SendDirectionRequest.direction:type_name -> api.proto.snake.v1.Direction
+	14, // 13: api.proto.snake.v1.Player.body:type_name -> api.proto.snake.v1.Point
+	1,  // 14: api.proto.snake.v1.Player.direction:type_name -> api.proto.snake.v1.Direction
+	4,  // 15: api.proto.snake.v1.SnakeGameService.CreateRoom:input_type -> api.proto.snake.v1.CreateRoomRequest
+	8,  // 16: api.proto.snake.v1.SnakeGameService.JoinGame:input_type -> api.proto.snake.v1.JoinGameRequest
+	10, // 17: api.proto.snake.v1.SnakeGameService.SendDirection:input_type -> api.proto.snake.v1.SendDirectionRequest
+	12, // 18: api.proto.snake.v1.SnakeGameService.GetTopPlayers:input_type -> api.proto.snake.v1.GetTopPlayersRequest
+	5,  // 19: api.proto.snake.v1.SnakeGameService.CreateRoom:output_type -> api.proto.snake.v1.CreateRoomResponse
+	9,  // 20: api.proto.snake.v1.SnakeGameService.JoinGame:output_type -> api.proto.snake.v1.JoinGameResponse
+	11, // 21: api.proto.snake.v1.SnakeGameService.SendDirection:output_type -> api.proto.snake.v1.SendDirectionResponse
+	6,  // 22: api.proto.snake.v1.SnakeGameService.GetTopPlayers:output_type -> api.proto.snake.v1.GetTopPlayersResponse
+	19, // [19:23] is the sub-list for method output_type
+	15, // [15:19] is the sub-list for method input_type
+	15, // [15:15] is the sub-list for extension type_name
+	15, // [15:15] is the sub-list for extension extendee
+	0,  // [0:15] is the sub-list for field type_name
 }
 
 func init() { file_api_proto_snake_v1_snake_proto_init() }
@@ -815,18 +1066,20 @@ func file_api_proto_snake_v1_snake_proto_init() {
 		(*ClientMessage_Join)(nil),
 		(*ClientMessage_Direction)(nil),
 		(*ClientMessage_Top)(nil),
+		(*ClientMessage_CreateRoom)(nil),
 	}
 	file_api_proto_snake_v1_snake_proto_msgTypes[1].OneofWrappers = []any{
 		(*ServerMessage_Update)(nil),
 		(*ServerMessage_Top)(nil),
+		(*ServerMessage_RoomCreated)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_proto_snake_v1_snake_proto_rawDesc), len(file_api_proto_snake_v1_snake_proto_rawDesc)),
-			NumEnums:      1,
-			NumMessages:   11,
+			NumEnums:      2,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

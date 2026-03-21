@@ -14,9 +14,12 @@ import (
 // Engine manages the game state and rules.
 type Engine struct {
 	cfg     *config.ServerConfig
+	roomID  string
+	mode    pb.GameMode
 	players map[string]*PlayerInfo
 	food    []*pb.Point
 	mu      sync.RWMutex
+	started bool
 
 	spawnPoints []spawnPoint
 }
@@ -123,9 +126,11 @@ const (
 )
 
 // NewEngine creates a new game engine.
-func NewEngine(cfg *config.ServerConfig) *Engine {
+func NewEngine(cfg *config.ServerConfig, roomID string, mode pb.GameMode) *Engine {
 	return &Engine{
 		cfg:     cfg,
+		roomID:  roomID,
+		mode:    mode,
 		players: make(map[string]*PlayerInfo),
 		food:    []*pb.Point{{X: 5, Y: 5}},
 		spawnPoints: []spawnPoint{
@@ -149,12 +154,39 @@ func NewEngine(cfg *config.ServerConfig) *Engine {
 	}
 }
 
-// AddOrUpdatePlayer adds a new player or resets an existing one.
+const (
+	maxPlayersSolo = 1
+	maxPlayers1v1  = 2
+	maxPlayersFFA  = 4
+)
+
+// MaxPlayers returns the maximum number of players allowed in the current mode.
+func (e *Engine) MaxPlayers() int {
+	switch e.mode {
+	case pb.GameMode_MODE_UNSPECIFIED:
+		return maxPlayersFFA
+	case pb.GameMode_MODE_SOLO:
+		return maxPlayersSolo
+	case pb.GameMode_MODE_1V1:
+		return maxPlayers1v1
+	case pb.GameMode_MODE_FFA:
+		return maxPlayersFFA
+	default:
+		return maxPlayersFFA
+	}
+}
+
+// AddOrUpdatePlayer adds a new player or resets an existing one. Returns nil if the room is full.
 func (e *Engine) AddOrUpdatePlayer(name string) *PlayerInfo {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
 	p, exists := e.players[name]
+
+	if !exists && len(e.players) >= e.MaxPlayers() {
+		return nil
+	}
+
 	sessionID := time.Now().UnixNano()
 
 	// Pick a spawn point based on the current number of players
@@ -171,6 +203,10 @@ func (e *Engine) AddOrUpdatePlayer(name string) *PlayerInfo {
 			SessionID: sessionID,
 		}
 		e.players[name] = p
+
+		if len(e.players) == e.MaxPlayers() {
+			e.started = true
+		}
 	} else {
 		p.SetAlive(true)
 		p.SetDirection(spawn.dir)
@@ -226,6 +262,8 @@ func (e *Engine) GetSnapshot() *pb.JoinGameResponse {
 	defer e.mu.RUnlock()
 
 	state := &pb.JoinGameResponse{
+		RoomId:  e.roomID,
+		Mode:    e.mode,
 		Players: make([]*pb.Player, 0, len(e.players)),
 		Food:    make([]*pb.Point, len(e.food)),
 	}
@@ -268,7 +306,13 @@ func (e *Engine) Run(onPlayerDie func(name string)) {
 	defer ticker.Stop()
 
 	for range ticker.C {
-		e.update(onPlayerDie)
+		e.mu.RLock()
+		started := e.started
+		e.mu.RUnlock()
+
+		if started {
+			e.update(onPlayerDie)
+		}
 	}
 }
 

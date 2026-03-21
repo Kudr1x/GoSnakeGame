@@ -5,6 +5,7 @@ import (
 	"GoSnakeGame/internal/config"
 	"GoSnakeGame/internal/game"
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -18,27 +19,32 @@ import (
 	pb "GoSnakeGame/api/proto/snake/v1"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
-
-// Engine defines the interface for the game engine.
-type Engine interface {
-	AddOrUpdatePlayer(name string) *game.PlayerInfo
-	RemovePlayer(name string, sessionID int64)
-	SetDirection(name string, dir pb.Direction)
-	GetSnapshot() *pb.JoinGameResponse
-	GetTopPlayers() []*pb.PlayerScore
-	Run(onPlayerDie func(name string))
-}
 
 type gameServer struct {
 	pb.UnimplementedSnakeGameServiceServer
-	engine Engine
-	cfg    *config.ServerConfig
+	roomManager *game.RoomManager
+	cfg         *config.ServerConfig
 }
 
-// GetTopPlayers returns the list of top 10 players by their best score.
+// CreateRoom handles room creation.
+func (s *gameServer) CreateRoom(_ context.Context, req *pb.CreateRoomRequest) (*pb.CreateRoomResponse, error) {
+	roomID := s.roomManager.CreateRoom(req.Mode)
+	log.Printf("room %s created with mode %v", roomID, req.Mode)
+
+	inviteLink := fmt.Sprintf("https://s.kudrix.com/%s", roomID)
+
+	return &pb.CreateRoomResponse{
+		RoomId:     roomID,
+		InviteLink: inviteLink,
+	}, nil
+}
+
+// GetTopPlayers returns the list of top players across all active rooms.
 func (s *gameServer) GetTopPlayers(_ context.Context, _ *pb.GetTopPlayersRequest) (*pb.GetTopPlayersResponse, error) {
-	playerScores := s.engine.GetTopPlayers()
+	playerScores := s.roomManager.GetTopPlayers()
 
 	sort.SliceStable(playerScores, func(i, j int) bool {
 		if playerScores[i].Score == playerScores[j].Score {
@@ -57,22 +63,35 @@ func (s *gameServer) GetTopPlayers(_ context.Context, _ *pb.GetTopPlayersRequest
 	}, nil
 }
 
-// JoinGame handles a new player joining the game and streams game updates.
+// JoinGame handles a new player joining a game room.
 func (s *gameServer) JoinGame(req *pb.JoinGameRequest, stream pb.SnakeGameService_JoinGameServer) error {
-	log.Printf("player %s joined", req.PlayerName)
+	log.Printf("player %s joining room %s", req.PlayerName, req.RoomId)
 
-	p := s.engine.AddOrUpdatePlayer(req.PlayerName)
+	engine, ok := s.roomManager.GetRoom(req.RoomId)
+	if !ok {
+		return status.Errorf(codes.NotFound, "room not found")
+	}
+
+	p := engine.AddOrUpdatePlayer(req.PlayerName)
+	if p == nil {
+		return status.Errorf(codes.ResourceExhausted, "room is full")
+	}
+
 	sessionID := p.SessionID
 
 	defer func() {
-		s.engine.RemovePlayer(req.PlayerName, sessionID)
-		log.Printf("player %s disconnected", req.PlayerName)
+		engine.RemovePlayer(req.PlayerName, sessionID)
+		log.Printf("player %s disconnected from room %s", req.PlayerName, req.RoomId)
 	}()
 
-	return s.gameLoop(p, stream)
+	return s.gameLoop(engine, p, stream)
 }
 
-func (s *gameServer) gameLoop(p *game.PlayerInfo, stream pb.SnakeGameService_JoinGameServer) error {
+func (s *gameServer) gameLoop(
+	engine *game.Engine,
+	p *game.PlayerInfo,
+	stream pb.SnakeGameService_JoinGameServer,
+) error {
 	ctx := stream.Context()
 	ticker := time.NewTicker(s.cfg.SendInterval)
 
@@ -81,13 +100,13 @@ func (s *gameServer) gameLoop(p *game.PlayerInfo, stream pb.SnakeGameService_Joi
 	for {
 		select {
 		case <-ctx.Done():
-			if err := ctx.Err(); err != nil && err != context.Canceled {
+			if err := ctx.Err(); err != nil && !errors.Is(err, context.Canceled) {
 				return fmt.Errorf("context error: %w", err)
 			}
 
 			return nil
 		case <-ticker.C:
-			state := s.engine.GetSnapshot()
+			state := engine.GetSnapshot()
 
 			if err := stream.Send(state); err != nil {
 				return fmt.Errorf("failed to send game state: %w", err)
@@ -104,7 +123,12 @@ func (s *gameServer) gameLoop(p *game.PlayerInfo, stream pb.SnakeGameService_Joi
 
 // SendDirection updates the direction of the player's snake.
 func (s *gameServer) SendDirection(_ context.Context, req *pb.SendDirectionRequest) (*pb.SendDirectionResponse, error) {
-	s.engine.SetDirection(req.PlayerName, req.Direction)
+	engine, ok := s.roomManager.GetRoom(req.RoomId)
+	if !ok {
+		return nil, status.Errorf(codes.NotFound, "room not found")
+	}
+
+	engine.SetDirection(req.PlayerName, req.Direction)
 
 	return &pb.SendDirectionResponse{}, nil
 }
@@ -120,15 +144,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	engine := game.NewEngine(cfg)
-
-	go engine.Run(func(name string) {
-		log.Printf("player %s died", name)
-	})
+	rm := game.NewRoomManager(cfg)
 
 	server := &gameServer{
-		engine: engine,
-		cfg:    cfg,
+		roomManager: rm,
+		cfg:         cfg,
 	}
 
 	s := grpc.NewServer()

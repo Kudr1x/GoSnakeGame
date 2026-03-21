@@ -13,7 +13,7 @@ func TestEngine_NewEngine(t *testing.T) {
 	t.Parallel()
 
 	cfg := config.DefaultServerConfig()
-	e := NewEngine(cfg)
+	e := NewEngine(cfg, "test_room", pb.GameMode_MODE_FFA)
 
 	assert.NotNil(t, e)
 	assert.NotNil(t, e.players)
@@ -26,7 +26,7 @@ func TestEngine_NewEngine(t *testing.T) {
 func TestEngine_AddOrUpdatePlayer(t *testing.T) {
 	t.Parallel()
 
-	e := NewEngine(config.DefaultServerConfig())
+	e := NewEngine(config.DefaultServerConfig(), "test_room", pb.GameMode_MODE_FFA)
 	p := e.AddOrUpdatePlayer("player1")
 
 	assert.NotNil(t, p)
@@ -42,7 +42,7 @@ func TestEngine_AddOrUpdatePlayer(t *testing.T) {
 func TestEngine_RemovePlayer(t *testing.T) {
 	t.Parallel()
 
-	e := NewEngine(config.DefaultServerConfig())
+	e := NewEngine(config.DefaultServerConfig(), "test_room", pb.GameMode_MODE_FFA)
 	p := e.AddOrUpdatePlayer("player1")
 
 	assert.Len(t, e.players, 1)
@@ -55,7 +55,7 @@ func TestEngine_RemovePlayer(t *testing.T) {
 func TestEngine_SetDirection(t *testing.T) {
 	t.Parallel()
 
-	e := NewEngine(config.DefaultServerConfig())
+	e := NewEngine(config.DefaultServerConfig(), "test_room", pb.GameMode_MODE_FFA)
 	p := e.AddOrUpdatePlayer("player1")
 
 	assert.Equal(t, pb.Direction_DIRECTION_RIGHT, p.GetDirection())
@@ -76,7 +76,7 @@ func TestEngine_SetDirection(t *testing.T) {
 func TestEngine_Update_PlayerMoves(t *testing.T) {
 	t.Parallel()
 
-	e := NewEngine(config.DefaultServerConfig())
+	e := NewEngine(config.DefaultServerConfig(), "test_room", pb.GameMode_MODE_FFA)
 
 	p := e.AddOrUpdatePlayer("player1")
 	p.SetBody([]*pb.Point{{X: 10, Y: 10}})
@@ -94,7 +94,7 @@ func TestEngine_Update_PlayerMoves(t *testing.T) {
 func TestEngine_Update_PlayerEatsFood(t *testing.T) {
 	t.Parallel()
 
-	e := NewEngine(config.DefaultServerConfig())
+	e := NewEngine(config.DefaultServerConfig(), "test_room", pb.GameMode_MODE_FFA)
 	p := e.AddOrUpdatePlayer("player1")
 	p.SetBody([]*pb.Point{{X: 5, Y: 6}})
 	p.SetDirection(pb.Direction_DIRECTION_UP)
@@ -117,7 +117,7 @@ func TestEngine_Update_PlayerEatsFood(t *testing.T) {
 func TestEngine_Update_PlayerHitsWall(t *testing.T) {
 	t.Parallel()
 
-	e := NewEngine(&config.ServerConfig{Width: 20, Height: 20})
+	e := NewEngine(&config.ServerConfig{Width: 20, Height: 20}, "test_room", pb.GameMode_MODE_FFA)
 	p := e.AddOrUpdatePlayer("player1")
 	p.SetBody([]*pb.Point{{X: 10, Y: 0}})
 	p.SetDirection(pb.Direction_DIRECTION_UP)
@@ -135,7 +135,7 @@ func TestEngine_Update_PlayerHitsWall(t *testing.T) {
 func TestEngine_Update_PlayerHitsSelf(t *testing.T) {
 	t.Parallel()
 
-	e := NewEngine(config.DefaultServerConfig())
+	e := NewEngine(config.DefaultServerConfig(), "test_room", pb.GameMode_MODE_FFA)
 	p := e.AddOrUpdatePlayer("player1")
 	p.SetBody([]*pb.Point{{X: 10, Y: 10}, {X: 10, Y: 11}, {X: 11, Y: 11}, {X: 11, Y: 10}})
 	p.SetDirection(pb.Direction_DIRECTION_DOWN)
@@ -150,11 +150,11 @@ func TestEngine_Update_PlayerHitsSelf(t *testing.T) {
 	assert.Equal(t, "player1", deadPlayerName)
 }
 
-// This test is flaky because the order of player updates is not guaranteed.
+// This test is deterministic now.
 func TestEngine_Update_PlayerHitsOtherPlayer(t *testing.T) {
 	t.Parallel()
 
-	e := NewEngine(config.DefaultServerConfig())
+	e := NewEngine(config.DefaultServerConfig(), "test_room", pb.GameMode_MODE_FFA)
 
 	p1 := e.AddOrUpdatePlayer("player1")
 	p2 := e.AddOrUpdatePlayer("player2")
@@ -162,13 +162,16 @@ func TestEngine_Update_PlayerHitsOtherPlayer(t *testing.T) {
 	p1.SetBody([]*pb.Point{{X: 10, Y: 10}})
 	p1.SetDirection(pb.Direction_DIRECTION_UP)
 
-	p2.SetBody([]*pb.Point{{X: 10, Y: 9}})
+	// p2 is long enough so that even if p2 moves first, its body still covers {10, 9}
+	p2.SetBody([]*pb.Point{{X: 10, Y: 9}, {X: 11, Y: 9}, {X: 12, Y: 9}})
 	p2.SetDirection(pb.Direction_DIRECTION_LEFT)
 
 	var deadPlayerName string
 
 	e.update(func(name string) {
-		deadPlayerName = name
+		if deadPlayerName == "" {
+			deadPlayerName = name
+		}
 	})
 
 	assert.False(t, p1.IsAlive())

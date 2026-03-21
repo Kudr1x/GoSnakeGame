@@ -19,6 +19,7 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
+	SnakeGameService_CreateRoom_FullMethodName    = "/api.proto.snake.v1.SnakeGameService/CreateRoom"
 	SnakeGameService_JoinGame_FullMethodName      = "/api.proto.snake.v1.SnakeGameService/JoinGame"
 	SnakeGameService_SendDirection_FullMethodName = "/api.proto.snake.v1.SnakeGameService/SendDirection"
 	SnakeGameService_GetTopPlayers_FullMethodName = "/api.proto.snake.v1.SnakeGameService/GetTopPlayers"
@@ -28,6 +29,7 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type SnakeGameServiceClient interface {
+	CreateRoom(ctx context.Context, in *CreateRoomRequest, opts ...grpc.CallOption) (*CreateRoomResponse, error)
 	JoinGame(ctx context.Context, in *JoinGameRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[JoinGameResponse], error)
 	SendDirection(ctx context.Context, in *SendDirectionRequest, opts ...grpc.CallOption) (*SendDirectionResponse, error)
 	GetTopPlayers(ctx context.Context, in *GetTopPlayersRequest, opts ...grpc.CallOption) (*GetTopPlayersResponse, error)
@@ -39,6 +41,16 @@ type snakeGameServiceClient struct {
 
 func NewSnakeGameServiceClient(cc grpc.ClientConnInterface) SnakeGameServiceClient {
 	return &snakeGameServiceClient{cc}
+}
+
+func (c *snakeGameServiceClient) CreateRoom(ctx context.Context, in *CreateRoomRequest, opts ...grpc.CallOption) (*CreateRoomResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateRoomResponse)
+	err := c.cc.Invoke(ctx, SnakeGameService_CreateRoom_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *snakeGameServiceClient) JoinGame(ctx context.Context, in *JoinGameRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[JoinGameResponse], error) {
@@ -84,6 +96,7 @@ func (c *snakeGameServiceClient) GetTopPlayers(ctx context.Context, in *GetTopPl
 // All implementations must embed UnimplementedSnakeGameServiceServer
 // for forward compatibility.
 type SnakeGameServiceServer interface {
+	CreateRoom(context.Context, *CreateRoomRequest) (*CreateRoomResponse, error)
 	JoinGame(*JoinGameRequest, grpc.ServerStreamingServer[JoinGameResponse]) error
 	SendDirection(context.Context, *SendDirectionRequest) (*SendDirectionResponse, error)
 	GetTopPlayers(context.Context, *GetTopPlayersRequest) (*GetTopPlayersResponse, error)
@@ -97,6 +110,9 @@ type SnakeGameServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedSnakeGameServiceServer struct{}
 
+func (UnimplementedSnakeGameServiceServer) CreateRoom(context.Context, *CreateRoomRequest) (*CreateRoomResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateRoom not implemented")
+}
 func (UnimplementedSnakeGameServiceServer) JoinGame(*JoinGameRequest, grpc.ServerStreamingServer[JoinGameResponse]) error {
 	return status.Error(codes.Unimplemented, "method JoinGame not implemented")
 }
@@ -125,6 +141,24 @@ func RegisterSnakeGameServiceServer(s grpc.ServiceRegistrar, srv SnakeGameServic
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&SnakeGameService_ServiceDesc, srv)
+}
+
+func _SnakeGameService_CreateRoom_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateRoomRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SnakeGameServiceServer).CreateRoom(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SnakeGameService_CreateRoom_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SnakeGameServiceServer).CreateRoom(ctx, req.(*CreateRoomRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _SnakeGameService_JoinGame_Handler(srv interface{}, stream grpc.ServerStream) error {
@@ -181,6 +215,10 @@ var SnakeGameService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "api.proto.snake.v1.SnakeGameService",
 	HandlerType: (*SnakeGameServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "CreateRoom",
+			Handler:    _SnakeGameService_CreateRoom_Handler,
+		},
 		{
 			MethodName: "SendDirection",
 			Handler:    _SnakeGameService_SendDirection_Handler,

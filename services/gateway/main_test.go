@@ -51,6 +51,21 @@ func (m *mockSnakeGameClient) SendDirection(
 	return args.Get(0).(*pb.SendDirectionResponse), nil
 }
 
+func (m *mockSnakeGameClient) CreateRoom(
+	ctx context.Context,
+	in *pb.CreateRoomRequest,
+	opts ...grpc.CallOption,
+) (*pb.CreateRoomResponse, error) {
+	args := m.Called(ctx, in, opts)
+
+	err := args.Error(1)
+	if err != nil {
+		return args.Get(0).(*pb.CreateRoomResponse), fmt.Errorf("mock error: %w", err)
+	}
+
+	return args.Get(0).(*pb.CreateRoomResponse), nil
+}
+
 func (m *mockSnakeGameClient) GetTopPlayers(
 	ctx context.Context,
 	in *pb.GetTopPlayersRequest,

@@ -124,6 +124,29 @@ func (h *gatewayHandler) handleClientMessage(ctx context.Context, writeCh chan<-
 		_, _ = h.grpcClient.SendDirection(ctx, payload.Direction)
 	case *pb.ClientMessage_Top:
 		go h.proxyTop(ctx, writeCh, payload.Top)
+	case *pb.ClientMessage_CreateRoom:
+		go h.proxyCreateRoom(ctx, writeCh, payload.CreateRoom)
+	}
+}
+
+func (h *gatewayHandler) proxyCreateRoom(ctx context.Context, writeCh chan<- []byte, req *pb.CreateRoomRequest) {
+	res, err := h.grpcClient.CreateRoom(ctx, req)
+	if err != nil {
+		return
+	}
+
+	out := &pb.ServerMessage{
+		Payload: &pb.ServerMessage_RoomCreated{RoomCreated: res},
+	}
+
+	data, err := proto.Marshal(out)
+	if err != nil {
+		return
+	}
+
+	select {
+	case writeCh <- data:
+	case <-ctx.Done():
 	}
 }
 
