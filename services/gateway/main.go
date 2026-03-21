@@ -56,6 +56,10 @@ func main() {
 	}
 }
 
+const (
+	writeBufferSize = 10
+)
+
 func (h *gatewayHandler) handleWS(w http.ResponseWriter, r *http.Request) {
 	c, err := websocket.Accept(w, r, &websocket.AcceptOptions{
 		InsecureSkipVerify: true,
@@ -72,6 +76,9 @@ func (h *gatewayHandler) handleWS(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	ctx := r.Context()
+	writeCh := make(chan []byte, writeBufferSize)
+
+	go h.writeLoop(ctx, c, writeCh)
 
 	for {
 		mt, data, err := c.Read(ctx)
@@ -88,18 +95,39 @@ func (h *gatewayHandler) handleWS(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		switch payload := msg.Payload.(type) {
-		case *pb.ClientMessage_Join:
-			go h.proxyJoin(ctx, c, payload.Join)
-		case *pb.ClientMessage_Direction:
-			_, _ = h.grpcClient.SendDirection(ctx, payload.Direction)
-		case *pb.ClientMessage_Top:
-			go h.proxyTop(ctx, c, payload.Top)
+		h.handleClientMessage(ctx, writeCh, &msg)
+	}
+}
+
+func (h *gatewayHandler) writeLoop(ctx context.Context, c *websocket.Conn, writeCh <-chan []byte) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case data, ok := <-writeCh:
+			if !ok {
+				return
+			}
+
+			if err := c.Write(ctx, websocket.MessageBinary, data); err != nil {
+				return
+			}
 		}
 	}
 }
 
-func (h *gatewayHandler) proxyJoin(ctx context.Context, c *websocket.Conn, req *pb.JoinGameRequest) {
+func (h *gatewayHandler) handleClientMessage(ctx context.Context, writeCh chan<- []byte, msg *pb.ClientMessage) {
+	switch payload := msg.Payload.(type) {
+	case *pb.ClientMessage_Join:
+		go h.proxyJoin(ctx, writeCh, payload.Join)
+	case *pb.ClientMessage_Direction:
+		_, _ = h.grpcClient.SendDirection(ctx, payload.Direction)
+	case *pb.ClientMessage_Top:
+		go h.proxyTop(ctx, writeCh, payload.Top)
+	}
+}
+
+func (h *gatewayHandler) proxyJoin(ctx context.Context, writeCh chan<- []byte, req *pb.JoinGameRequest) {
 	stream, err := h.grpcClient.JoinGame(ctx, req)
 	if err != nil {
 		return
@@ -124,13 +152,15 @@ func (h *gatewayHandler) proxyJoin(ctx context.Context, c *websocket.Conn, req *
 			continue
 		}
 
-		if err := c.Write(ctx, websocket.MessageBinary, data); err != nil {
+		select {
+		case writeCh <- data:
+		case <-ctx.Done():
 			return
 		}
 	}
 }
 
-func (h *gatewayHandler) proxyTop(ctx context.Context, c *websocket.Conn, req *pb.GetTopPlayersRequest) {
+func (h *gatewayHandler) proxyTop(ctx context.Context, writeCh chan<- []byte, req *pb.GetTopPlayersRequest) {
 	res, err := h.grpcClient.GetTopPlayers(ctx, req)
 	if err != nil {
 		return
@@ -145,5 +175,8 @@ func (h *gatewayHandler) proxyTop(ctx context.Context, c *websocket.Conn, req *p
 		return
 	}
 
-	_ = c.Write(ctx, websocket.MessageBinary, data)
+	select {
+	case writeCh <- data:
+	case <-ctx.Done():
+	}
 }

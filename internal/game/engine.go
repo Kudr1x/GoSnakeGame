@@ -234,10 +234,11 @@ func (e *Engine) GetSnapshot() *pb.JoinGameResponse {
 
 	for _, p := range e.players {
 		state.Players = append(state.Players, &pb.Player{
-			Id:    p.ID,
-			Name:  p.Name,
-			Body:  p.GetBody(),
-			Alive: p.IsAlive(),
+			Id:        p.ID,
+			Name:      p.Name,
+			Body:      p.GetBody(),
+			Alive:     p.IsAlive(),
+			Direction: p.GetDirection(),
 		})
 	}
 

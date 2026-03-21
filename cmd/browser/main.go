@@ -28,6 +28,7 @@ import (
 type gameClient struct {
 	playerName   string
 	conn         *websocket.Conn
+	writeCh      chan []byte
 	dirCh        chan pb.Direction
 	currentState *pb.JoinGameResponse
 	mu           sync.RWMutex
@@ -41,6 +42,8 @@ type gameClient struct {
 
 	rectPool []*canvas.Rectangle
 	active   []*canvas.Rectangle
+
+	topPlayersLabel *widget.Label
 
 	gameOver func()
 }
@@ -76,13 +79,16 @@ func main() {
 	}
 
 	gc := &gameClient{
-		conn:   conn,
-		dirCh:  make(chan pb.Direction, 1),
-		cfg:    cfg,
-		ctx:    ctx,
-		cancel: cancel,
+		conn:    conn,
+		writeCh: make(chan []byte, 10),
+		dirCh:   make(chan pb.Direction, 1),
+		cfg:     cfg,
+		ctx:     ctx,
+		cancel:  cancel,
 	}
 	gc.gameOver = gc.showGameOverScreen
+
+	go gc.writeLoop()
 
 	a := app.New()
 	gc.mainWindow = a.NewWindow("Snake Game")
@@ -173,9 +179,12 @@ func (gc *gameClient) joinGame() {
 		},
 	}
 	data, _ := proto.Marshal(joinMsg)
-	_ = gc.conn.Write(gc.ctx, websocket.MessageBinary, data)
+	select {
+	case gc.writeCh <- data:
+	case <-gc.ctx.Done():
+	}
 
-	gc.currentDir = pb.Direction_DIRECTION_UP
+	gc.currentDir = pb.Direction_DIRECTION_UNSPECIFIED
 
 	go gc.readLoop(gc.stopGameCh)
 	go gc.sendDirection(gc.stopGameCh)
@@ -195,12 +204,12 @@ func (gc *gameClient) createGameUI(stopCh chan struct{}) fyne.CanvasObject {
 	scoreLabel.Move(fyne.NewPos(scoreX, float32(gc.cfg.Margin)))
 	gameContainer.Add(scoreLabel)
 
-	topPlayersLabel := widget.NewLabel("Loading top...")
+	gc.topPlayersLabel = widget.NewLabel("Loading top...")
 	topX := float32(gc.cfg.Width*gc.cfg.CellSize + gc.cfg.SidebarScoreOffset)
-	topPlayersLabel.Move(fyne.NewPos(topX, float32(gc.cfg.SidebarTopOffset)))
-	gameContainer.Add(topPlayersLabel)
+	gc.topPlayersLabel.Move(fyne.NewPos(topX, float32(gc.cfg.SidebarTopOffset)))
+	gameContainer.Add(gc.topPlayersLabel)
 
-	go gc.updateTopPlayersLoop(stopCh, topPlayersLabel)
+	go gc.updateTopPlayersLoop(stopCh, gc.topPlayersLabel)
 	go gc.renderLoop(stopCh, gameContainer, scoreLabel)
 
 	return gameContainer
@@ -217,7 +226,10 @@ func (gc *gameClient) updateTopPlayersLoop(stopCh chan struct{}, label *widget.L
 			},
 		}
 		data, _ := proto.Marshal(msg)
-		_ = gc.conn.Write(gc.ctx, websocket.MessageBinary, data)
+		select {
+		case gc.writeCh <- data:
+		case <-gc.ctx.Done():
+		}
 	}
 
 	updateTop()
@@ -357,16 +369,27 @@ func (gc *gameClient) readLoop(stopCh chan struct{}) {
 				state := payload.Update
 				gc.mu.Lock()
 				gc.currentState = state
-				gc.mu.Unlock()
-
 				for _, p := range state.Players {
-					if p.Name == gc.playerName && !p.Alive {
-						gc.gameOver()
-						return
+					if p.Name == gc.playerName {
+						if p.Direction != pb.Direction_DIRECTION_UNSPECIFIED {
+							gc.currentDir = p.Direction
+						}
+						if !p.Alive {
+							gc.mu.Unlock()
+							gc.gameOver()
+							return
+						}
 					}
 				}
+				gc.mu.Unlock()
 			case *pb.ServerMessage_Top:
-				// Handled by direct update if needed or just logged
+				top := payload.Top
+				playerList := make([]string, 0, len(top.TopPlayers)+1)
+				playerList = append(playerList, "Top Players:")
+				for _, p := range top.TopPlayers {
+					playerList = append(playerList, fmt.Sprintf("%s: %d", p.PlayerName, p.Score))
+				}
+				gc.topPlayersLabel.SetText(strings.Join(playerList, "\n"))
 			}
 		}
 	}
@@ -387,11 +410,30 @@ func (gc *gameClient) sendDirection(stopCh chan struct{}) {
 				},
 			}
 			data, _ := proto.Marshal(msg)
-			_ = gc.conn.Write(gc.ctx, websocket.MessageBinary, data)
-			
+			select {
+			case gc.writeCh <- data:
+			case <-gc.ctx.Done():
+			}
+
 			gc.mu.Lock()
 			gc.currentDir = dir
 			gc.mu.Unlock()
+		}
+	}
+}
+
+func (gc *gameClient) writeLoop() {
+	for {
+		select {
+		case <-gc.ctx.Done():
+			return
+		case data, ok := <-gc.writeCh:
+			if !ok {
+				return
+			}
+			if err := gc.conn.Write(gc.ctx, websocket.MessageBinary, data); err != nil {
+				return
+			}
 		}
 	}
 }

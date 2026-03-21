@@ -57,6 +57,7 @@ message Player {
   repeated Point body = 2;
   bool alive = 3;
   int32 id = 4;
+  Direction direction = 5;
 }
 
 message Point {

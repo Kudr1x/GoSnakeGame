@@ -578,6 +578,7 @@ type Player struct {
 	Body          []*Point               `protobuf:"bytes,2,rep,name=body,proto3" json:"body,omitempty"`
 	Alive         bool                   `protobuf:"varint,3,opt,name=alive,proto3" json:"alive,omitempty"`
 	Id            int32                  `protobuf:"varint,4,opt,name=id,proto3" json:"id,omitempty"`
+	Direction     Direction              `protobuf:"varint,5,opt,name=direction,proto3,enum=api.proto.snake.v1.Direction" json:"direction,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -638,6 +639,13 @@ func (x *Player) GetId() int32 {
 		return x.Id
 	}
 	return 0
+}
+
+func (x *Player) GetDirection() Direction {
+	if x != nil {
+		return x.Direction
+	}
+	return Direction_DIRECTION_UNSPECIFIED
 }
 
 type Point struct {
@@ -724,12 +732,13 @@ const file_api_proto_snake_v1_snake_proto_rawDesc = "" +
 	"playerName\x12;\n" +
 	"\tdirection\x18\x02 \x01(\x0e2\x1d.api.proto.snake.v1.DirectionR\tdirection\"\x17\n" +
 	"\x15SendDirectionResponse\"\x16\n" +
-	"\x14GetTopPlayersRequest\"q\n" +
+	"\x14GetTopPlayersRequest\"\xae\x01\n" +
 	"\x06Player\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12-\n" +
 	"\x04body\x18\x02 \x03(\v2\x19.api.proto.snake.v1.PointR\x04body\x12\x14\n" +
 	"\x05alive\x18\x03 \x01(\bR\x05alive\x12\x0e\n" +
-	"\x02id\x18\x04 \x01(\x05R\x02id\"#\n" +
+	"\x02id\x18\x04 \x01(\x05R\x02id\x12;\n" +
+	"\tdirection\x18\x05 \x01(\x0e2\x1d.api.proto.snake.v1.DirectionR\tdirection\"#\n" +
 	"\x05Point\x12\f\n" +
 	"\x01x\x18\x01 \x01(\x05R\x01x\x12\f\n" +
 	"\x01y\x18\x02 \x01(\x05R\x01y*u\n" +
@@ -783,17 +792,18 @@ var file_api_proto_snake_v1_snake_proto_depIdxs = []int32{
 	11, // 7: api.proto.snake.v1.JoinGameResponse.food:type_name -> api.proto.snake.v1.Point
 	0,  // 8: api.proto.snake.v1.SendDirectionRequest.direction:type_name -> api.proto.snake.v1.Direction
 	11, // 9: api.proto.snake.v1.Player.body:type_name -> api.proto.snake.v1.Point
-	5,  // 10: api.proto.snake.v1.SnakeGameService.JoinGame:input_type -> api.proto.snake.v1.JoinGameRequest
-	7,  // 11: api.proto.snake.v1.SnakeGameService.SendDirection:input_type -> api.proto.snake.v1.SendDirectionRequest
-	9,  // 12: api.proto.snake.v1.SnakeGameService.GetTopPlayers:input_type -> api.proto.snake.v1.GetTopPlayersRequest
-	6,  // 13: api.proto.snake.v1.SnakeGameService.JoinGame:output_type -> api.proto.snake.v1.JoinGameResponse
-	8,  // 14: api.proto.snake.v1.SnakeGameService.SendDirection:output_type -> api.proto.snake.v1.SendDirectionResponse
-	3,  // 15: api.proto.snake.v1.SnakeGameService.GetTopPlayers:output_type -> api.proto.snake.v1.GetTopPlayersResponse
-	13, // [13:16] is the sub-list for method output_type
-	10, // [10:13] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	0,  // 10: api.proto.snake.v1.Player.direction:type_name -> api.proto.snake.v1.Direction
+	5,  // 11: api.proto.snake.v1.SnakeGameService.JoinGame:input_type -> api.proto.snake.v1.JoinGameRequest
+	7,  // 12: api.proto.snake.v1.SnakeGameService.SendDirection:input_type -> api.proto.snake.v1.SendDirectionRequest
+	9,  // 13: api.proto.snake.v1.SnakeGameService.GetTopPlayers:input_type -> api.proto.snake.v1.GetTopPlayersRequest
+	6,  // 14: api.proto.snake.v1.SnakeGameService.JoinGame:output_type -> api.proto.snake.v1.JoinGameResponse
+	8,  // 15: api.proto.snake.v1.SnakeGameService.SendDirection:output_type -> api.proto.snake.v1.SendDirectionResponse
+	3,  // 16: api.proto.snake.v1.SnakeGameService.GetTopPlayers:output_type -> api.proto.snake.v1.GetTopPlayersResponse
+	14, // [14:17] is the sub-list for method output_type
+	11, // [11:14] is the sub-list for method input_type
+	11, // [11:11] is the sub-list for extension type_name
+	11, // [11:11] is the sub-list for extension extendee
+	0,  // [0:11] is the sub-list for field type_name
 }
 
 func init() { file_api_proto_snake_v1_snake_proto_init() }
