@@ -17,11 +17,19 @@ type Engine struct {
 	players map[string]*PlayerInfo
 	food    []*pb.Point
 	mu      sync.RWMutex
+
+	spawnPoints []spawnPoint
+}
+
+type spawnPoint struct {
+	pos *pb.Point
+	dir pb.Direction
 }
 
 // PlayerInfo stores the internal state of a player.
 type PlayerInfo struct {
 	mu        sync.RWMutex
+	ID        int32
 	Name      string
 	Body      []*pb.Point
 	Alive     bool
@@ -110,12 +118,34 @@ func (p *PlayerInfo) SetSessionID(id int64) {
 	p.SessionID = id
 }
 
+const (
+	spawnOffset = 3
+)
+
 // NewEngine creates a new game engine.
 func NewEngine(cfg *config.ServerConfig) *Engine {
 	return &Engine{
 		cfg:     cfg,
 		players: make(map[string]*PlayerInfo),
 		food:    []*pb.Point{{X: 5, Y: 5}},
+		spawnPoints: []spawnPoint{
+			{pos: &pb.Point{X: 2, Y: 2}, dir: pb.Direction_DIRECTION_RIGHT},
+			// #nosec G115 - Dimensions are safe for int32
+			{
+				pos: &pb.Point{X: int32(cfg.Width - spawnOffset), Y: int32(cfg.Height - spawnOffset)},
+				dir: pb.Direction_DIRECTION_LEFT,
+			},
+			// #nosec G115 - Dimensions are safe for int32
+			{
+				pos: &pb.Point{X: int32(cfg.Width - spawnOffset), Y: 2},
+				dir: pb.Direction_DIRECTION_DOWN,
+			},
+			// #nosec G115 - Dimensions are safe for int32
+			{
+				pos: &pb.Point{X: 2, Y: int32(cfg.Height - spawnOffset)},
+				dir: pb.Direction_DIRECTION_UP,
+			},
+		},
 	}
 }
 
@@ -127,19 +157,24 @@ func (e *Engine) AddOrUpdatePlayer(name string) *PlayerInfo {
 	p, exists := e.players[name]
 	sessionID := time.Now().UnixNano()
 
+	// Pick a spawn point based on the current number of players
+	spawn := e.spawnPoints[len(e.players)%len(e.spawnPoints)]
+
 	if !exists {
 		p = &PlayerInfo{
+			// #nosec G115 - Player count will not exceed int32 limits
+			ID:        int32(len(e.players) + 1),
 			Name:      name,
-			Body:      []*pb.Point{{X: 10, Y: 10}},
+			Body:      []*pb.Point{{X: spawn.pos.X, Y: spawn.pos.Y}},
 			Alive:     true,
-			Dir:       pb.Direction_DIRECTION_UP,
+			Dir:       spawn.dir,
 			SessionID: sessionID,
 		}
 		e.players[name] = p
 	} else {
 		p.SetAlive(true)
-		p.SetDirection(pb.Direction_DIRECTION_UP)
-		p.SetBody([]*pb.Point{{X: 10, Y: 10}})
+		p.SetDirection(spawn.dir)
+		p.SetBody([]*pb.Point{{X: spawn.pos.X, Y: spawn.pos.Y}})
 		p.SetSessionID(sessionID)
 	}
 
@@ -199,6 +234,7 @@ func (e *Engine) GetSnapshot() *pb.JoinGameResponse {
 
 	for _, p := range e.players {
 		state.Players = append(state.Players, &pb.Player{
+			Id:    p.ID,
 			Name:  p.Name,
 			Body:  p.GetBody(),
 			Alive: p.IsAlive(),

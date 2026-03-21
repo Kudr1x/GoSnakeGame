@@ -41,6 +41,7 @@ message Player {
   string name = 1;
   repeated Point body = 2;
   bool alive = 3;
+  int32 id = 4;
 }
 
 message Point {

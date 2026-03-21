@@ -58,21 +58,19 @@ func TestEngine_SetDirection(t *testing.T) {
 	e := NewEngine(config.DefaultServerConfig())
 	p := e.AddOrUpdatePlayer("player1")
 
-	assert.Equal(t, pb.Direction_DIRECTION_UP, p.GetDirection())
+	assert.Equal(t, pb.Direction_DIRECTION_RIGHT, p.GetDirection())
+
+	e.SetDirection(p.Name, pb.Direction_DIRECTION_LEFT)
+	assert.Equal(t, pb.Direction_DIRECTION_RIGHT, e.players[p.Name].GetDirection())
+
+	e.SetDirection(p.Name, pb.Direction_DIRECTION_UP)
+	assert.Equal(t, pb.Direction_DIRECTION_UP, e.players[p.Name].GetDirection())
 
 	e.SetDirection(p.Name, pb.Direction_DIRECTION_DOWN)
-
 	assert.Equal(t, pb.Direction_DIRECTION_UP, e.players[p.Name].GetDirection())
 
 	e.SetDirection(p.Name, pb.Direction_DIRECTION_LEFT)
 	assert.Equal(t, pb.Direction_DIRECTION_LEFT, e.players[p.Name].GetDirection())
-
-	e.SetDirection(p.Name, pb.Direction_DIRECTION_RIGHT)
-
-	assert.Equal(t, pb.Direction_DIRECTION_LEFT, e.players[p.Name].GetDirection())
-
-	e.SetDirection(p.Name, pb.Direction_DIRECTION_UP)
-	assert.Equal(t, pb.Direction_DIRECTION_UP, e.players[p.Name].GetDirection())
 }
 
 func TestEngine_Update_PlayerMoves(t *testing.T) {

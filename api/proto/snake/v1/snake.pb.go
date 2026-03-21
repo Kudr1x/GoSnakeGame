@@ -7,12 +7,11 @@
 package snake
 
 import (
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
-
-	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
-	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 )
 
 const (
@@ -398,6 +397,7 @@ type Player struct {
 	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	Body          []*Point               `protobuf:"bytes,2,rep,name=body,proto3" json:"body,omitempty"`
 	Alive         bool                   `protobuf:"varint,3,opt,name=alive,proto3" json:"alive,omitempty"`
+	Id            int32                  `protobuf:"varint,4,opt,name=id,proto3" json:"id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -451,6 +451,13 @@ func (x *Player) GetAlive() bool {
 		return x.Alive
 	}
 	return false
+}
+
+func (x *Player) GetId() int32 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
 }
 
 type Point struct {
@@ -528,11 +535,12 @@ const file_api_proto_snake_v1_snake_proto_rawDesc = "" +
 	"playerName\x12;\n" +
 	"\tdirection\x18\x02 \x01(\x0e2\x1d.api.proto.snake.v1.DirectionR\tdirection\"\x17\n" +
 	"\x15SendDirectionResponse\"\x16\n" +
-	"\x14GetTopPlayersRequest\"a\n" +
+	"\x14GetTopPlayersRequest\"q\n" +
 	"\x06Player\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12-\n" +
 	"\x04body\x18\x02 \x03(\v2\x19.api.proto.snake.v1.PointR\x04body\x12\x14\n" +
-	"\x05alive\x18\x03 \x01(\bR\x05alive\"#\n" +
+	"\x05alive\x18\x03 \x01(\bR\x05alive\x12\x0e\n" +
+	"\x02id\x18\x04 \x01(\x05R\x02id\"#\n" +
 	"\x05Point\x12\f\n" +
 	"\x01x\x18\x01 \x01(\x05R\x01x\x12\f\n" +
 	"\x01y\x18\x02 \x01(\x05R\x01y*u\n" +

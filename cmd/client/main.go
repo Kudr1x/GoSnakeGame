@@ -27,7 +27,7 @@ import (
 
 type gameClient struct {
 	playerName   string
-	client       SnakeGameClient
+	client       pb.SnakeGameServiceClient
 	stream       pb.SnakeGameService_JoinGameClient
 	dirCh        chan pb.Direction
 	currentState *pb.JoinGameResponse
@@ -39,7 +39,6 @@ type gameClient struct {
 	cancelStream context.CancelFunc
 	cfg          *config.ClientConfig
 
-	// UI object pool
 	rectPool []*canvas.Rectangle
 	active   []*canvas.Rectangle
 
@@ -269,25 +268,44 @@ func (gc *gameClient) drawFrame(
 		gc.drawRect(container, f.X, f.Y, foodColor)
 	}
 
-	// Draw Players
 	for _, p := range state.Players {
-		if !p.Alive && p.Name != gc.playerName {
-			continue
-		}
-
-		snakeColor := color.RGBA{R: 0, G: 0, B: 255, A: 255}
-		if p.Name == gc.playerName {
-			snakeColor = color.RGBA{R: 0, G: 255, B: 0, A: 255}
-			gc.currentScore = len(p.Body) * gc.cfg.ScoreMultiplier
-			scoreLabel.SetText(fmt.Sprintf("Score: %d", gc.currentScore))
-		}
-
-		for _, bodyPart := range p.Body {
-			gc.drawRect(container, bodyPart.X, bodyPart.Y, snakeColor)
-		}
+		gc.drawPlayer(container, scoreLabel, p)
 	}
 
 	container.Refresh()
+}
+
+func (gc *gameClient) drawPlayer(
+	container *fyne.Container,
+	scoreLabel *widget.Label,
+	p *pb.Player,
+) {
+	if !p.Alive && p.Name != gc.playerName {
+		return
+	}
+
+	var snakeColor color.RGBA
+	if p.Name == gc.playerName {
+		snakeColor = color.RGBA{R: 0, G: 255, B: 0, A: 255}
+		gc.currentScore = len(p.Body) * gc.cfg.ScoreMultiplier
+		scoreLabel.SetText(fmt.Sprintf("Score: %d", gc.currentScore))
+	} else {
+		//nolint:mnd // Magic numbers are used for color variety based on ID
+		switch (p.Id - 1) % 4 {
+		case 0:
+			snakeColor = color.RGBA{R: 0, G: 191, B: 255, A: 255}
+		case 1:
+			snakeColor = color.RGBA{R: 255, G: 165, B: 0, A: 255}
+		case 2:
+			snakeColor = color.RGBA{R: 138, G: 43, B: 226, A: 255}
+		default:
+			snakeColor = color.RGBA{R: 255, G: 20, B: 147, A: 255}
+		}
+	}
+
+	for _, bodyPart := range p.Body {
+		gc.drawRect(container, bodyPart.X, bodyPart.Y, snakeColor)
+	}
 }
 
 func (gc *gameClient) drawRect(container *fyne.Container, x, y int32, fillColor color.Color) {
