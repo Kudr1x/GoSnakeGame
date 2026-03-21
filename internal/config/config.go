@@ -9,6 +9,7 @@ import (
 // ServerConfig defines the server-side configuration.
 type ServerConfig struct {
 	Addr            string
+	WebAddr         string
 	Width           int
 	Height          int
 	UpdateInterval  time.Duration
@@ -40,6 +41,7 @@ type ClientConfig struct {
 func DefaultServerConfig() *ServerConfig {
 	return &ServerConfig{
 		Addr:            ":50051",
+		WebAddr:         ":8080",
 		Width:           20,
 		Height:          20,
 		UpdateInterval:  150 * time.Millisecond,
@@ -53,7 +55,8 @@ func DefaultServerConfig() *ServerConfig {
 
 // ParseFlags parses server flags.
 func (c *ServerConfig) ParseFlags(fs *flag.FlagSet) {
-	fs.StringVar(&c.Addr, "addr", c.Addr, "server address")
+	fs.StringVar(&c.Addr, "addr", c.Addr, "server address for raw gRPC")
+	fs.StringVar(&c.WebAddr, "web-addr", c.WebAddr, "server address for gRPC-Web (HTTP)")
 	fs.IntVar(&c.Width, "width", c.Width, "game width")
 	fs.IntVar(&c.Height, "height", c.Height, "game height")
 }

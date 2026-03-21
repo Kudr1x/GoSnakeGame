@@ -51,7 +51,7 @@ jobs:
           sudo apt-get install -y libgl1-mesa-dev xorg-dev
 
       - name: Build Server
-        run: go build -v -o bin/server ./cmd/server
+        run: make build
 
-      - name: Build Client
-        run: go build -v -o bin/client ./cmd/client
+      - name: Build WASM
+        run: make build-wasm

@@ -10,6 +10,21 @@ service SnakeGameService {
   rpc GetTopPlayers(GetTopPlayersRequest) returns (GetTopPlayersResponse);
 }
 
+message ClientMessage {
+  oneof payload {
+    JoinGameRequest join = 1;
+    SendDirectionRequest direction = 2;
+    GetTopPlayersRequest top = 3;
+  }
+}
+
+message ServerMessage {
+  oneof payload {
+    JoinGameResponse update = 1;
+    GetTopPlayersResponse top = 2;
+  }
+}
+
 message GetTopPlayersResponse {
   repeated PlayerScore top_players = 1;
 }

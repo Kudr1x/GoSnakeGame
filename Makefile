@@ -1,16 +1,15 @@
-.PHONY: all proto build lint lint-go lint-proto clean run-server run-client help
+.PHONY: all proto build build-wasm lint clean run-engine run-gateway run-terminal help
 
 PROTO_DIR = api/proto
 PROTO_SRC = $(PROTO_DIR)/snake/v1/snake.proto
-SERVER_MAIN = cmd/server/main.go
-CLIENT_MAIN = cmd/client/main.go
 BIN_DIR = bin
-BIN_SERVER = $(BIN_DIR)/server
-BIN_CLIENT = $(BIN_DIR)/client
+BIN_ENGINE = $(BIN_DIR)/game-engine
+BIN_GATEWAY = $(BIN_DIR)/gateway
+BIN_TERMINAL = $(BIN_DIR)/terminal
+WEB_DIR = web
+WASM_CLIENT = $(WEB_DIR)/client.wasm
 
 MODULE = GoSnakeGame
-
-all: proto build
 
 proto:
 	mkdir -p api/proto/snake/v1
@@ -22,34 +21,33 @@ proto:
 
 build:
 	mkdir -p $(BIN_DIR)
-	go build -o $(BIN_SERVER) $(SERVER_MAIN)
-	go build -o $(BIN_CLIENT) $(CLIENT_MAIN)
+	go build -o $(BIN_ENGINE) ./services/game-engine
+	go build -o $(BIN_GATEWAY) ./services/gateway
+	go build -o $(BIN_TERMINAL) ./cmd/terminal
+	@echo "ok"
+
+build-wasm:
+	mkdir -p $(WEB_DIR)
+	GOOS=js GOARCH=wasm go build -o $(WASM_CLIENT) ./cmd/browser
 	@echo "ok"
 
 lint:
 	golangci-lint run ./...
 	@echo "ok"
 
-run-server:
-	go run $(SERVER_MAIN)
+run-engine:
+	go run ./services/game-engine
 
-run-client:
-	go run $(CLIENT_MAIN)
+run-gateway:
+	go run ./services/gateway
+
+run-terminal:
+	go run ./cmd/terminal
 
 clean:
-	rm -rf $(BIN_DIR)
+	rm -rf $(BIN_DIR) $(WASM_CLIENT)
 	@echo "ok"
 	
 test:
 	go test -v -race ./...
 	@echo "ok"
-
-help:
-	@echo "Usage:"
-	@echo "  make proto       - Generate Go code from .proto files"
-	@echo "  make build       - Build server and client binaries"
-	@echo "  make lint        - Run all linters (Go and Proto)"
-	@echo "  make run-server  - Run server using 'go run'"
-	@echo "  make run-client  - Run client using 'go run'"
-	@echo "  make clean       - Remove build artifacts"
-	@echo "  make test        - Run tests"
