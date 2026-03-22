@@ -146,6 +146,17 @@ func main() {
 
 	rm := game.NewRoomManager(cfg)
 
+	go func() {
+		const cleanupInterval = 30 * time.Second
+		ticker := time.NewTicker(cleanupInterval)
+
+		defer ticker.Stop()
+
+		for range ticker.C {
+			rm.CleanupEmptyRooms()
+		}
+	}()
+
 	server := &gameServer{
 		roomManager: rm,
 		cfg:         cfg,

@@ -76,9 +76,11 @@ func TestEngine_SetDirection(t *testing.T) {
 func TestEngine_Update_PlayerMoves(t *testing.T) {
 	t.Parallel()
 
-	e := NewEngine(config.DefaultServerConfig(), "test_room", pb.GameMode_MODE_FFA)
+	e := NewEngine(config.DefaultServerConfig(), "test_room", pb.GameMode_MODE_SOLO)
 
 	p := e.AddOrUpdatePlayer("player1")
+	e.started = true
+
 	p.SetBody([]*pb.Point{{X: 10, Y: 10}})
 	p.SetDirection(pb.Direction_DIRECTION_UP)
 
@@ -94,8 +96,10 @@ func TestEngine_Update_PlayerMoves(t *testing.T) {
 func TestEngine_Update_PlayerEatsFood(t *testing.T) {
 	t.Parallel()
 
-	e := NewEngine(config.DefaultServerConfig(), "test_room", pb.GameMode_MODE_FFA)
+	e := NewEngine(config.DefaultServerConfig(), "test_room", pb.GameMode_MODE_SOLO)
 	p := e.AddOrUpdatePlayer("player1")
+	e.started = true
+
 	p.SetBody([]*pb.Point{{X: 5, Y: 6}})
 	p.SetDirection(pb.Direction_DIRECTION_UP)
 
@@ -117,8 +121,10 @@ func TestEngine_Update_PlayerEatsFood(t *testing.T) {
 func TestEngine_Update_PlayerHitsWall(t *testing.T) {
 	t.Parallel()
 
-	e := NewEngine(&config.ServerConfig{Width: 20, Height: 20}, "test_room", pb.GameMode_MODE_FFA)
+	e := NewEngine(&config.ServerConfig{Width: 20, Height: 20}, "test_room", pb.GameMode_MODE_SOLO)
 	p := e.AddOrUpdatePlayer("player1")
+	e.started = true
+
 	p.SetBody([]*pb.Point{{X: 10, Y: 0}})
 	p.SetDirection(pb.Direction_DIRECTION_UP)
 
@@ -135,8 +141,10 @@ func TestEngine_Update_PlayerHitsWall(t *testing.T) {
 func TestEngine_Update_PlayerHitsSelf(t *testing.T) {
 	t.Parallel()
 
-	e := NewEngine(config.DefaultServerConfig(), "test_room", pb.GameMode_MODE_FFA)
+	e := NewEngine(config.DefaultServerConfig(), "test_room", pb.GameMode_MODE_SOLO)
 	p := e.AddOrUpdatePlayer("player1")
+	e.started = true
+
 	p.SetBody([]*pb.Point{{X: 10, Y: 10}, {X: 10, Y: 11}, {X: 11, Y: 11}, {X: 11, Y: 10}})
 	p.SetDirection(pb.Direction_DIRECTION_DOWN)
 
@@ -158,6 +166,7 @@ func TestEngine_Update_PlayerHitsOtherPlayer(t *testing.T) {
 
 	p1 := e.AddOrUpdatePlayer("player1")
 	p2 := e.AddOrUpdatePlayer("player2")
+	e.started = true
 
 	p1.SetBody([]*pb.Point{{X: 10, Y: 10}})
 	p1.SetDirection(pb.Direction_DIRECTION_UP)

@@ -472,6 +472,10 @@ func (gc *App) showGameOverScreen() {
 				gc.joinGame()
 			} else {
 				gc.mainWindow.Close()
+
+				if gc.transport != nil {
+					_ = gc.transport.Close()
+				}
 			}
 		},
 		gc.mainWindow,

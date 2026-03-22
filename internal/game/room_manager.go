@@ -49,6 +49,19 @@ func (rm *RoomManager) GetRoom(roomID string) (*Engine, bool) {
 	return engine, ok
 }
 
+// CleanupEmptyRooms removes empty rooms to free resources.
+func (rm *RoomManager) CleanupEmptyRooms() {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+
+	for id, engine := range rm.rooms {
+		if engine.IsEmpty() {
+			engine.Stop()
+			delete(rm.rooms, id)
+		}
+	}
+}
+
 // GetTopPlayers returns the top players across all rooms.
 func (rm *RoomManager) GetTopPlayers() []*pb.PlayerScore {
 	rm.mu.RLock()

@@ -22,6 +22,8 @@ type Engine struct {
 	started bool
 
 	spawnPoints []spawnPoint
+	stopped     bool
+	stopCh      chan struct{}
 }
 
 type spawnPoint struct {
@@ -133,6 +135,7 @@ func NewEngine(cfg *config.ServerConfig, roomID string, mode pb.GameMode) *Engin
 		mode:    mode,
 		players: make(map[string]*PlayerInfo),
 		food:    []*pb.Point{{X: 5, Y: 5}},
+		stopCh:  make(chan struct{}),
 		spawnPoints: []spawnPoint{
 			{pos: &pb.Point{X: 2, Y: 2}, dir: pb.Direction_DIRECTION_RIGHT},
 			// #nosec G115 - Dimensions are safe for int32
@@ -152,6 +155,25 @@ func NewEngine(cfg *config.ServerConfig, roomID string, mode pb.GameMode) *Engin
 			},
 		},
 	}
+}
+
+// Stop stops the game engine.
+func (e *Engine) Stop() {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	if !e.stopped {
+		e.stopped = true
+		close(e.stopCh)
+	}
+}
+
+// IsEmpty returns true if there are no players in the room.
+func (e *Engine) IsEmpty() bool {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	return len(e.players) == 0
 }
 
 const (
@@ -305,13 +327,18 @@ func (e *Engine) Run(onPlayerDie func(name string)) {
 	ticker := time.NewTicker(e.cfg.UpdateInterval)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		e.mu.RLock()
-		started := e.started
-		e.mu.RUnlock()
+	for {
+		select {
+		case <-e.stopCh:
+			return
+		case <-ticker.C:
+			e.mu.RLock()
+			started := e.started
+			e.mu.RUnlock()
 
-		if started {
-			e.update(onPlayerDie)
+			if started {
+				e.update(onPlayerDie)
+			}
 		}
 	}
 }
@@ -319,6 +346,10 @@ func (e *Engine) Run(onPlayerDie func(name string)) {
 func (e *Engine) update(onPlayerDie func(name string)) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
+
+	if e.checkWinCondition(onPlayerDie) {
+		return
+	}
 
 	for _, p := range e.players {
 		if !p.IsAlive() {
@@ -349,6 +380,35 @@ func (e *Engine) update(onPlayerDie func(name string)) {
 			p.SetBody(body[:len(body)-1])
 		}
 	}
+}
+
+// checkWinCondition checks if the game should end based on the number of survivors.
+// Returns true if a win condition is met.
+func (e *Engine) checkWinCondition(onPlayerDie func(name string)) bool {
+	aliveCount := 0
+
+	for _, p := range e.players {
+		if p.IsAlive() {
+			aliveCount++
+		}
+	}
+
+	// Win condition for multiplayer
+	if e.mode != pb.GameMode_MODE_SOLO && aliveCount <= 1 {
+		for _, p := range e.players {
+			if p.IsAlive() {
+				p.SetAlive(false)
+
+				if onPlayerDie != nil {
+					onPlayerDie(p.Name)
+				}
+			}
+		}
+
+		return true
+	}
+
+	return false
 }
 
 func (e *Engine) getNewHead(p *PlayerInfo) *pb.Point {
