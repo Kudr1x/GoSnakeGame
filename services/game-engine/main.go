@@ -31,10 +31,18 @@ type gameServer struct {
 
 // CreateRoom handles room creation.
 func (s *gameServer) CreateRoom(_ context.Context, req *pb.CreateRoomRequest) (*pb.CreateRoomResponse, error) {
-	roomID := s.roomManager.CreateRoom(req.Mode)
+	roomID, err := s.roomManager.CreateRoom(req.Mode)
+	if err != nil {
+		if errors.Is(err, game.ErrMaxRoomsReached) {
+			return nil, status.Errorf(codes.ResourceExhausted, "server is full")
+		}
+
+		return nil, status.Errorf(codes.Internal, "failed to create room: %v", err)
+	}
+
 	log.Printf("room %s created with mode %v", roomID, req.Mode)
 
-	inviteLink := fmt.Sprintf("https://s.kudrix.com/%s", roomID)
+	inviteLink := fmt.Sprintf("https://s.kudrix.com/#%s", roomID)
 
 	return &pb.CreateRoomResponse{
 		RoomId:     roomID,

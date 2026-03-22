@@ -39,8 +39,10 @@ type App struct {
 	rectPool []*canvas.Rectangle
 	active   []*canvas.Rectangle
 
-	gameOver func()
+	gameOver func(bool)
 }
+
+const maxNameLength = 12
 
 // NewApp creates a new game application.
 func NewApp(cfg *config.ClientConfig, transport Transport) *App {
@@ -60,6 +62,7 @@ func (gc *App) Run() {
 	gc.mainWindow = a.NewWindow("Snake Game")
 	gc.mainWindow.SetFixedSize(true)
 
+	gc.checkInviteLink()
 	gc.showJoinScreen()
 
 	gc.mainWindow.Canvas().SetOnTypedKey(gc.handleKeyPress)
@@ -72,14 +75,23 @@ func (gc *App) Run() {
 
 func (gc *App) showJoinScreen() {
 	nameEntry := widget.NewEntry()
-	nameEntry.SetPlaceHolder("Enter your name")
+	nameEntry.SetPlaceHolder("Enter your name (max 12 chars)")
+	nameEntry.Text = gc.playerName
 
 	modeSelect := widget.NewSelect([]string{"Solo", "1v1", "4-Player"}, nil)
 	modeSelect.SetSelected("Solo")
 
 	createButton := widget.NewButton("Create Room", func() {
-		gc.playerName = nameEntry.Text
+		gc.playerName = strings.TrimSpace(nameEntry.Text)
 		if gc.playerName == "" {
+			dialog.ShowError(fmt.Errorf("name cannot be empty"), gc.mainWindow)
+
+			return
+		}
+
+		if len(gc.playerName) > maxNameLength {
+			dialog.ShowError(fmt.Errorf("name too long"), gc.mainWindow)
+
 			return
 		}
 
@@ -112,24 +124,31 @@ func (gc *App) showJoinScreen() {
 		gc.roomID = resp.RoomId
 
 		if mode != pb.GameMode_MODE_SOLO {
-			dialog.ShowInformation(
+			d := dialog.NewInformation(
 				"Room Created",
 				fmt.Sprintf("Room ID: %s\nInvite Link: %s", resp.RoomId, resp.InviteLink),
 				gc.mainWindow,
 			)
+			d.SetOnClosed(func() {
+				gc.joinGame()
+			})
+			d.Show()
+		} else {
+			gc.joinGame()
 		}
-
-		gc.joinGame()
 	})
 
 	roomIDEntry := widget.NewEntry()
 	roomIDEntry.SetPlaceHolder("Or enter Room ID to join")
+	roomIDEntry.Text = gc.roomID
 
 	joinButton := widget.NewButton("Join Room", func() {
-		gc.playerName = nameEntry.Text
-		gc.roomID = roomIDEntry.Text
+		gc.playerName = strings.TrimSpace(nameEntry.Text)
+		gc.roomID = strings.TrimSpace(roomIDEntry.Text)
 
 		if gc.playerName == "" || gc.roomID == "" {
+			dialog.ShowError(fmt.Errorf("name and room ID are required"), gc.mainWindow)
+
 			return
 		}
 
@@ -405,6 +424,8 @@ func (gc *App) getStringTop() string {
 }
 
 func (gc *App) receiveGameState(stopCh chan struct{}) {
+	var lastAliveCount int
+
 	for {
 		select {
 		case <-stopCh:
@@ -417,19 +438,46 @@ func (gc *App) receiveGameState(stopCh chan struct{}) {
 				return
 			}
 
-			gc.mu.Lock()
-			gc.currentState = state
-			gc.mu.Unlock()
+			gc.updateState(state)
 
-			for _, p := range state.Players {
-				if p.Name == gc.playerName && !p.Alive {
-					gc.gameOver()
+			aliveCount, myPlayer := gc.analyzePlayers(state)
 
-					return
-				}
+			if myPlayer != nil && !myPlayer.Alive {
+				// If I'm dead, check if I was the last one alive or if it was a solo game
+				winner := (state.Mode != pb.GameMode_MODE_SOLO && lastAliveCount == 1 && aliveCount == 0)
+
+				gc.gameOver(winner)
+
+				return
 			}
+
+			lastAliveCount = aliveCount
 		}
 	}
+}
+
+func (gc *App) updateState(state *pb.JoinGameResponse) {
+	gc.mu.Lock()
+	defer gc.mu.Unlock()
+	gc.currentState = state
+}
+
+func (gc *App) analyzePlayers(state *pb.JoinGameResponse) (int, *pb.Player) {
+	aliveCount := 0
+
+	var myPlayer *pb.Player
+
+	for _, p := range state.Players {
+		if p.Alive {
+			aliveCount++
+		}
+
+		if p.Name == gc.playerName {
+			myPlayer = p
+		}
+	}
+
+	return aliveCount, myPlayer
 }
 
 func (gc *App) sendDirection(stopCh chan struct{}) {
@@ -459,11 +507,16 @@ func (gc *App) sendDirection(stopCh chan struct{}) {
 	}
 }
 
-func (gc *App) showGameOverScreen() {
+func (gc *App) showGameOverScreen(winner bool) {
+	title := "Game over"
+	if winner {
+		title = "YOU WIN!"
+	}
+
 	dialog.ShowCustomConfirm(
-		"Game over",
-		"Reboot",
-		"Exit",
+		title,
+		"Retry",
+		"Menu",
 		container.NewVBox(
 			widget.NewLabel(fmt.Sprintf("Your score %d", gc.currentScore)),
 		),
@@ -471,11 +524,7 @@ func (gc *App) showGameOverScreen() {
 			if restart {
 				gc.joinGame()
 			} else {
-				gc.mainWindow.Close()
-
-				if gc.transport != nil {
-					_ = gc.transport.Close()
-				}
+				gc.showJoinScreen()
 			}
 		},
 		gc.mainWindow,

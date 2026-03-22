@@ -47,7 +47,7 @@ func TestGameServer_CreateRoom(t *testing.T) {
 	resp, err := server.CreateRoom(context.Background(), req)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, resp.RoomId)
-	assert.NotEmpty(t, resp.InviteLink)
+	assert.Contains(t, resp.InviteLink, "/#"+resp.RoomId)
 
 	_, ok := rm.GetRoom(resp.RoomId)
 	assert.True(t, ok)
@@ -63,7 +63,7 @@ func TestGameServer_SendDirection(t *testing.T) {
 		cfg:         cfg,
 	}
 
-	roomID := rm.CreateRoom(pb.GameMode_MODE_SOLO)
+	roomID, _ := rm.CreateRoom(pb.GameMode_MODE_SOLO)
 	engine, _ := rm.GetRoom(roomID)
 	engine.AddOrUpdatePlayer("test_player")
 
@@ -91,7 +91,7 @@ func TestGameServer_JoinGame(t *testing.T) {
 		cfg:         cfg,
 	}
 
-	roomID := rm.CreateRoom(pb.GameMode_MODE_SOLO)
+	roomID, _ := rm.CreateRoom(pb.GameMode_MODE_SOLO)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	mockStream := &mockJoinGameServer{ctx: ctx}

@@ -200,7 +200,7 @@ func TestReceiveGameState(t *testing.T) {
 	gc := &App{
 		playerName: "test_player",
 		transport:  mockTrans,
-		gameOver: func() {
+		gameOver: func(_ bool) {
 			gameOverMu.Lock()
 			defer gameOverMu.Unlock()
 			gameOverCalled = true

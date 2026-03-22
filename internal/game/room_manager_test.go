@@ -15,7 +15,8 @@ func TestRoomManager_CreateRoom(t *testing.T) {
 	cfg := config.DefaultServerConfig()
 	rm := NewRoomManager(cfg)
 
-	roomID := rm.CreateRoom(pb.GameMode_MODE_SOLO)
+	roomID, err := rm.CreateRoom(pb.GameMode_MODE_SOLO)
+	assert.NoError(t, err)
 	assert.NotEmpty(t, roomID)
 
 	engine, ok := rm.GetRoom(roomID)
@@ -24,18 +25,33 @@ func TestRoomManager_CreateRoom(t *testing.T) {
 	assert.Equal(t, pb.GameMode_MODE_SOLO, engine.mode)
 }
 
+func TestRoomManager_CreateRoom_Limit(t *testing.T) {
+	t.Parallel()
+
+	cfg := config.DefaultServerConfig()
+	rm := NewRoomManager(cfg)
+
+	for i := 0; i < 100; i++ {
+		_, err := rm.CreateRoom(pb.GameMode_MODE_SOLO)
+		assert.NoError(t, err)
+	}
+
+	_, err := rm.CreateRoom(pb.GameMode_MODE_SOLO)
+	assert.ErrorIs(t, err, ErrMaxRoomsReached)
+}
+
 func TestRoomManager_GetTopPlayers(t *testing.T) {
 	t.Parallel()
 
 	cfg := config.DefaultServerConfig()
 	rm := NewRoomManager(cfg)
 
-	roomID1 := rm.CreateRoom(pb.GameMode_MODE_SOLO)
+	roomID1, _ := rm.CreateRoom(pb.GameMode_MODE_SOLO)
 	engine1, _ := rm.GetRoom(roomID1)
 	p1 := engine1.AddOrUpdatePlayer("p1")
 	p1.SetBestScore(100)
 
-	roomID2 := rm.CreateRoom(pb.GameMode_MODE_SOLO)
+	roomID2, _ := rm.CreateRoom(pb.GameMode_MODE_SOLO)
 	engine2, _ := rm.GetRoom(roomID2)
 	p2 := engine2.AddOrUpdatePlayer("p2")
 	p2.SetBestScore(200)
