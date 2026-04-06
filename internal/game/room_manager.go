@@ -2,6 +2,7 @@ package game
 
 import (
 	"GoSnakeGame/internal/config"
+	"GoSnakeGame/internal/metrics"
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
@@ -61,6 +62,10 @@ func (rm *RoomManager) CreateRoom(mode pb.GameMode) (string, error) {
 	engine := NewEngine(rm.cfg, roomID, mode)
 	rm.rooms[roomID] = engine
 
+	// Update metrics
+	metrics.RoomsCreated.Inc()
+	metrics.ActiveRooms.Set(float64(len(rm.rooms)))
+
 	// Start the game loop for this room
 	go engine.Run(nil)
 
@@ -82,11 +87,20 @@ func (rm *RoomManager) CleanupEmptyRooms() {
 	rm.mu.Lock()
 	defer rm.mu.Unlock()
 
+	cleaned := 0
+
 	for id, engine := range rm.rooms {
 		if engine.IsEmpty() {
 			engine.Stop()
 			delete(rm.rooms, id)
+
+			cleaned++
 		}
+	}
+
+	if cleaned > 0 {
+		metrics.RoomsCleaned.Add(float64(cleaned))
+		metrics.ActiveRooms.Set(float64(len(rm.rooms)))
 	}
 }
 

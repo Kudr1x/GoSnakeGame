@@ -3,14 +3,18 @@ package main
 
 import (
 	pb "GoSnakeGame/api/proto/snake/v1"
+	"GoSnakeGame/internal/logger"
+	"GoSnakeGame/internal/metrics"
 	"context"
 	"errors"
+	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"time"
 
 	"github.com/coder/websocket"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/proto"
@@ -21,14 +25,22 @@ type gatewayHandler struct {
 }
 
 func main() {
+	if err := logger.Init(false); err != nil {
+		panic(fmt.Sprintf("failed to initialize logger: %v", err))
+	}
+
+	defer func() {
+		_ = logger.Sync()
+	}()
+
 	conn, err := grpc.NewClient("localhost:50051", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		log.Fatalf("failed to connect to engine: %v", err)
+		logger.Get().Fatal("failed to connect to engine", zap.Error(err))
 	}
 
 	defer func() {
 		if err := conn.Close(); err != nil {
-			log.Printf("failed to close grpc connection: %v", err)
+			logger.Get().Error("failed to close grpc connection", zap.Error(err))
 		}
 	}()
 
@@ -38,6 +50,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws", h.handleWS)
+	mux.Handle("/metrics", promhttp.Handler())
 
 	mux.Handle("/", http.FileServer(http.Dir("web")))
 
@@ -49,10 +62,10 @@ func main() {
 		WriteTimeout:      10 * time.Second,
 	}
 
-	log.Println("Gateway listening on :8080...")
+	logger.Get().Info("gateway listening on :8080")
 
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		log.Printf("failed to start gateway: %v", err)
+		logger.Get().Fatal("failed to start gateway", zap.Error(err))
 	}
 }
 
@@ -66,12 +79,16 @@ func (h *gatewayHandler) handleWS(w http.ResponseWriter, r *http.Request) {
 		OriginPatterns:     []string{"*"},
 	})
 	if err != nil {
-		log.Printf("failed to accept websocket: %v", err)
+		logger.Get().Error("failed to accept websocket", zap.Error(err))
 
 		return
 	}
 
+	metrics.WebSocketConnections.Inc()
+
 	defer func() {
+		metrics.WebSocketConnections.Dec()
+
 		_ = c.Close(websocket.StatusInternalError, "internal error")
 	}()
 
@@ -119,12 +136,20 @@ func (h *gatewayHandler) writeLoop(ctx context.Context, c *websocket.Conn, write
 func (h *gatewayHandler) handleClientMessage(ctx context.Context, writeCh chan<- []byte, msg *pb.ClientMessage) {
 	switch payload := msg.Payload.(type) {
 	case *pb.ClientMessage_Join:
+		metrics.MessagesReceived.WithLabelValues("join").Inc()
+
 		go h.proxyJoin(ctx, writeCh, payload.Join)
 	case *pb.ClientMessage_Direction:
+		metrics.MessagesReceived.WithLabelValues("direction").Inc()
+
 		_, _ = h.grpcClient.SendDirection(ctx, payload.Direction)
 	case *pb.ClientMessage_Top:
+		metrics.MessagesReceived.WithLabelValues("top").Inc()
+
 		go h.proxyTop(ctx, writeCh, payload.Top)
 	case *pb.ClientMessage_CreateRoom:
+		metrics.MessagesReceived.WithLabelValues("create_room").Inc()
+
 		go h.proxyCreateRoom(ctx, writeCh, payload.CreateRoom)
 	}
 }

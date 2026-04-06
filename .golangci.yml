@@ -109,3 +109,10 @@ issues:
   exclude-use-default: false
   max-issues-per-linter: 0
   max-same-issues: 0
+  exclude-rules:
+    - path: internal/metrics/metrics.go
+      linters:
+        - gochecknoglobals
+    - path: internal/logger/logger.go
+      linters:
+        - gochecknoglobals

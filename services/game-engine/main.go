@@ -4,12 +4,14 @@ package main
 import (
 	"GoSnakeGame/internal/config"
 	"GoSnakeGame/internal/game"
+	"GoSnakeGame/internal/logger"
+	"GoSnakeGame/internal/metrics"
 	"context"
 	"errors"
 	"flag"
 	"fmt"
-	"log"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"sort"
@@ -18,6 +20,8 @@ import (
 
 	pb "GoSnakeGame/api/proto/snake/v1"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -31,8 +35,15 @@ type gameServer struct {
 
 // CreateRoom handles room creation.
 func (s *gameServer) CreateRoom(_ context.Context, req *pb.CreateRoomRequest) (*pb.CreateRoomResponse, error) {
+	start := time.Now()
+	defer func() {
+		metrics.RequestDuration.WithLabelValues("CreateRoom").Observe(time.Since(start).Seconds())
+	}()
+
 	roomID, err := s.roomManager.CreateRoom(req.Mode)
 	if err != nil {
+		metrics.ErrorsTotal.WithLabelValues("create_room").Inc()
+
 		if errors.Is(err, game.ErrMaxRoomsReached) {
 			return nil, status.Errorf(codes.ResourceExhausted, "server is full")
 		}
@@ -40,7 +51,9 @@ func (s *gameServer) CreateRoom(_ context.Context, req *pb.CreateRoomRequest) (*
 		return nil, status.Errorf(codes.Internal, "failed to create room: %v", err)
 	}
 
-	log.Printf("room %s created with mode %v", roomID, req.Mode)
+	logger.Get().Info("room created",
+		zap.String("room_id", roomID),
+		zap.String("mode", req.Mode.String()))
 
 	inviteLink := fmt.Sprintf("https://s.kudrix.com/#%s", roomID)
 
@@ -73,7 +86,9 @@ func (s *gameServer) GetTopPlayers(_ context.Context, _ *pb.GetTopPlayersRequest
 
 // JoinGame handles a new player joining a game room.
 func (s *gameServer) JoinGame(req *pb.JoinGameRequest, stream pb.SnakeGameService_JoinGameServer) error {
-	log.Printf("player %s joining room %s", req.PlayerName, req.RoomId)
+	logger.Get().Info("player joining room",
+		zap.String("player", req.PlayerName),
+		zap.String("room_id", req.RoomId))
 
 	engine, ok := s.roomManager.GetRoom(req.RoomId)
 	if !ok {
@@ -89,7 +104,9 @@ func (s *gameServer) JoinGame(req *pb.JoinGameRequest, stream pb.SnakeGameServic
 
 	defer func() {
 		engine.RemovePlayer(req.PlayerName, sessionID)
-		log.Printf("player %s disconnected from room %s", req.PlayerName, req.RoomId)
+		logger.Get().Info("player disconnected",
+			zap.String("player", req.PlayerName),
+			zap.String("room_id", req.RoomId))
 	}()
 
 	return s.gameLoop(engine, p, stream)
@@ -142,14 +159,23 @@ func (s *gameServer) SendDirection(_ context.Context, req *pb.SendDirectionReque
 }
 
 func main() {
+	if err := logger.Init(false); err != nil {
+		panic(fmt.Sprintf("failed to initialize logger: %v", err))
+	}
+
+	defer func() {
+		_ = logger.Sync()
+	}()
+
 	cfg := config.DefaultServerConfig()
 	cfg.ParseFlags(flag.CommandLine)
 	flag.Parse()
 
 	lis, err := net.Listen("tcp", cfg.Addr)
 	if err != nil {
-		log.Printf("failed to listen on %s: %v", cfg.Addr, err)
-		os.Exit(1)
+		logger.Get().Fatal("failed to listen",
+			zap.String("addr", cfg.Addr),
+			zap.Error(err))
 	}
 
 	rm := game.NewRoomManager(cfg)
@@ -162,6 +188,23 @@ func main() {
 
 		for range ticker.C {
 			rm.CleanupEmptyRooms()
+		}
+	}()
+
+	// Start metrics server
+	go func() {
+		mux := http.NewServeMux()
+		mux.Handle("/metrics", promhttp.Handler())
+		metricsServer := &http.Server{
+			Addr:              ":9090",
+			Handler:           mux,
+			ReadHeaderTimeout: 5 * time.Second,
+		}
+
+		logger.Get().Info("metrics server listening on :9090")
+
+		if err := metricsServer.ListenAndServe(); err != nil {
+			logger.Get().Error("metrics server error", zap.Error(err))
 		}
 	}()
 
@@ -178,14 +221,13 @@ func main() {
 
 	go func() {
 		<-stop
-		log.Println("stopping server")
+		logger.Get().Info("stopping server")
 		s.GracefulStop()
 	}()
 
-	log.Printf("gRPC engine listening on %s", cfg.Addr)
+	logger.Get().Info("gRPC engine listening", zap.String("addr", cfg.Addr))
 
 	if err := s.Serve(lis); err != nil {
-		log.Printf("gRPC server error: %v", err)
-		os.Exit(1)
+		logger.Get().Fatal("gRPC server error", zap.Error(err))
 	}
 }

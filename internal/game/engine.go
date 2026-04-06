@@ -3,6 +3,7 @@ package game
 
 import (
 	"GoSnakeGame/internal/config"
+	"GoSnakeGame/internal/metrics"
 	"math"
 	"math/rand"
 	"sync"
@@ -226,6 +227,8 @@ func (e *Engine) AddOrUpdatePlayer(name string) *PlayerInfo {
 		}
 		e.players[name] = p
 
+		metrics.ActivePlayers.Inc()
+
 		if len(e.players) == e.MaxPlayers() {
 			e.started = true
 		}
@@ -246,6 +249,7 @@ func (e *Engine) RemovePlayer(name string, sessionID int64) {
 
 	if p, ok := e.players[name]; ok && p.GetSessionID() == sessionID {
 		delete(e.players, name)
+		metrics.ActivePlayers.Dec()
 	}
 }
 
