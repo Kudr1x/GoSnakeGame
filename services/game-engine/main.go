@@ -196,12 +196,12 @@ func main() {
 		mux := http.NewServeMux()
 		mux.Handle("/metrics", promhttp.Handler())
 		metricsServer := &http.Server{
-			Addr:              ":9090",
+			Addr:              cfg.MetricsAddr,
 			Handler:           mux,
 			ReadHeaderTimeout: 5 * time.Second,
 		}
 
-		logger.Get().Info("metrics server listening on :9090")
+		logger.Get().Info("metrics server listening", zap.String("addr", cfg.MetricsAddr))
 
 		if err := metricsServer.ListenAndServe(); err != nil {
 			logger.Get().Error("metrics server error", zap.Error(err))
