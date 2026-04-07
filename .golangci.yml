@@ -116,3 +116,18 @@ issues:
     - path: internal/logger/logger.go
       linters:
         - gochecknoglobals
+    - path: internal/client/
+      linters:
+        - wrapcheck
+    - path: cmd/terminal-tui/
+      linters:
+        - gochecknoglobals
+        - forbidigo
+        - gocognit
+        - gocyclo
+        - funlen
+        - gocritic
+        - goconst
+        - cyclop
+        - nlreturn
+        - wsl

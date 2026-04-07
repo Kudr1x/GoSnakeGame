@@ -23,9 +23,10 @@ type Engine struct {
 	mu      sync.RWMutex
 	started bool
 
-	spawnPoints []spawnPoint
-	stopped     bool
-	stopCh      chan struct{}
+	spawnPoints    []spawnPoint
+	stopped        bool
+	stopCh         chan struct{}
+	systemMessages chan *pb.SystemMessage
 }
 
 type spawnPoint struct {
@@ -147,13 +148,16 @@ const (
 
 // NewEngine creates a new game engine.
 func NewEngine(cfg *config.ServerConfig, roomID string, mode pb.GameMode) *Engine {
+	const systemMessageBufferSize = 100
+
 	return &Engine{
-		cfg:     cfg,
-		roomID:  roomID,
-		mode:    mode,
-		players: make(map[string]*PlayerInfo),
-		food:    []*pb.Point{{X: 5, Y: 5}},
-		stopCh:  make(chan struct{}),
+		cfg:            cfg,
+		roomID:         roomID,
+		mode:           mode,
+		players:        make(map[string]*PlayerInfo),
+		food:           []*pb.Point{{X: 5, Y: 5}},
+		stopCh:         make(chan struct{}),
+		systemMessages: make(chan *pb.SystemMessage, systemMessageBufferSize),
 		spawnPoints: []spawnPoint{
 			{pos: &pb.Point{X: 2, Y: 2}, dir: pb.Direction_DIRECTION_RIGHT},
 			// #nosec G115 - Dimensions are safe for int32
@@ -183,6 +187,24 @@ func (e *Engine) Stop() {
 	if !e.stopped {
 		e.stopped = true
 		close(e.stopCh)
+		close(e.systemMessages)
+	}
+}
+
+// GetSystemMessages returns the channel for system messages.
+func (e *Engine) GetSystemMessages() <-chan *pb.SystemMessage {
+	return e.systemMessages
+}
+
+// BroadcastSystemMessage sends a system message to all players.
+func (e *Engine) BroadcastSystemMessage(msgType pb.SystemMessageType, message, playerName string) {
+	select {
+	case e.systemMessages <- &pb.SystemMessage{
+		Type:       msgType,
+		Message:    message,
+		PlayerName: playerName,
+	}:
+	default:
 	}
 }
 
@@ -247,8 +269,22 @@ func (e *Engine) AddOrUpdatePlayer(name string) *PlayerInfo {
 
 		metrics.ActivePlayers.Inc()
 
+		// Broadcast player joined message
+		e.BroadcastSystemMessage(
+			pb.SystemMessageType_SYSTEM_MESSAGE_PLAYER_JOINED,
+			name+" joined the game",
+			name,
+		)
+
 		if len(e.players) == e.MaxPlayers() {
 			e.started = true
+
+			// Broadcast game started message
+			e.BroadcastSystemMessage(
+				pb.SystemMessageType_SYSTEM_MESSAGE_GAME_STARTED,
+				"Game started!",
+				"",
+			)
 		}
 	} else {
 		p.SetAlive(true)
@@ -268,6 +304,13 @@ func (e *Engine) RemovePlayer(name string, sessionID int64) {
 	if p, ok := e.players[name]; ok && p.GetSessionID() == sessionID {
 		delete(e.players, name)
 		metrics.ActivePlayers.Dec()
+
+		// Broadcast player left message
+		e.BroadcastSystemMessage(
+			pb.SystemMessageType_SYSTEM_MESSAGE_PLAYER_LEFT,
+			name+" left the game",
+			name,
+		)
 	}
 }
 
@@ -322,6 +365,13 @@ func (e *Engine) GetSnapshot() *pb.JoinGameResponse {
 			Alive:     p.IsAlive(),
 			Direction: p.GetDirection(),
 		})
+	}
+
+	// Check for system message
+	select {
+	case msg := <-e.systemMessages:
+		state.SystemMessage = msg
+	default:
 	}
 
 	return state
@@ -410,33 +460,73 @@ func (e *Engine) update(onPlayerDie func(name string)) {
 // checkWinCondition checks if the game should end based on the number of survivors.
 // Returns true if a win condition is met.
 func (e *Engine) checkWinCondition(onPlayerDie func(name string)) bool {
-	aliveCount := 0
+	aliveCount := e.countAlivePlayers()
+
+	// Win condition for multiplayer
+	if e.mode == pb.GameMode_MODE_SOLO || aliveCount > 1 {
+		return false
+	}
+
+	e.handleGameEnd(onPlayerDie)
+
+	return true
+}
+
+// countAlivePlayers returns the number of alive players.
+func (e *Engine) countAlivePlayers() int {
+	count := 0
 
 	for _, p := range e.players {
 		if p.IsAlive() {
-			aliveCount++
+			count++
 		}
 	}
 
-	// Win condition for multiplayer
-	if e.mode != pb.GameMode_MODE_SOLO && aliveCount <= 1 {
-		// Update ratings before ending game
-		e.updateRatings()
+	return count
+}
 
-		for _, p := range e.players {
-			if p.IsAlive() {
-				p.SetAlive(false)
+// handleGameEnd handles the end of the game.
+func (e *Engine) handleGameEnd(onPlayerDie func(name string)) {
+	e.updateRatings()
 
-				if onPlayerDie != nil {
-					onPlayerDie(p.Name)
-				}
+	winnerName := e.findAndKillWinner(onPlayerDie)
+	e.broadcastGameEndMessage(winnerName)
+}
+
+// findAndKillWinner finds the winner and marks them as dead.
+func (e *Engine) findAndKillWinner(onPlayerDie func(name string)) string {
+	for _, p := range e.players {
+		if p.IsAlive() {
+			p.SetAlive(false)
+
+			if onPlayerDie != nil {
+				onPlayerDie(p.Name)
 			}
-		}
 
-		return true
+			return p.Name
+		}
 	}
 
-	return false
+	return ""
+}
+
+// broadcastGameEndMessage broadcasts the game end message.
+func (e *Engine) broadcastGameEndMessage(winnerName string) {
+	if winnerName != "" {
+		e.BroadcastSystemMessage(
+			pb.SystemMessageType_SYSTEM_MESSAGE_GAME_ENDED,
+			winnerName+" won the game!",
+			winnerName,
+		)
+
+		return
+	}
+
+	e.BroadcastSystemMessage(
+		pb.SystemMessageType_SYSTEM_MESSAGE_GAME_ENDED,
+		"Game ended",
+		"",
+	)
 }
 
 // updateRatings updates player ratings based on game results.

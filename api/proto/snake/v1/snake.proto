@@ -32,7 +32,22 @@ message ServerMessage {
     JoinGameResponse update = 1;
     GetTopPlayersResponse top = 2;
     CreateRoomResponse room_created = 3;
+    SystemMessage system = 4;
   }
+}
+
+enum SystemMessageType {
+  SYSTEM_MESSAGE_UNSPECIFIED = 0;
+  SYSTEM_MESSAGE_PLAYER_JOINED = 1;
+  SYSTEM_MESSAGE_PLAYER_LEFT = 2;
+  SYSTEM_MESSAGE_GAME_STARTED = 3;
+  SYSTEM_MESSAGE_GAME_ENDED = 4;
+}
+
+message SystemMessage {
+  SystemMessageType type = 1;
+  string message = 2;
+  string player_name = 3;
 }
 
 message CreateRoomRequest {
@@ -65,6 +80,7 @@ message JoinGameResponse {
   repeated Point food = 2;
   string room_id = 3;
   GameMode mode = 4;
+  SystemMessage system_message = 5;
 }
 
 message SendDirectionRequest {

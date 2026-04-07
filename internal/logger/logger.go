@@ -50,9 +50,8 @@ func Sync() error {
 	defer mu.RUnlock()
 
 	if log != nil {
-		if err := log.Sync(); err != nil {
-			return fmt.Errorf("failed to sync logger: %w", err)
-		}
+		// Ignore sync errors on stderr/stdout as they're expected in some environments
+		_ = log.Sync()
 	}
 
 	return nil

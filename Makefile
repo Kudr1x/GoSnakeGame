@@ -5,7 +5,7 @@ PROTO_SRC = $(PROTO_DIR)/snake/v1/snake.proto
 BIN_DIR = bin
 BIN_ENGINE = $(BIN_DIR)/game-engine
 BIN_GATEWAY = $(BIN_DIR)/gateway
-BIN_TERMINAL = $(BIN_DIR)/terminal
+BIN_TERMINAL = $(BIN_DIR)/terminal-tui
 WEB_DIR = web
 WASM_CLIENT = $(WEB_DIR)/client.wasm
 
@@ -23,7 +23,7 @@ build:
 	mkdir -p $(BIN_DIR)
 	go build -o $(BIN_ENGINE) ./services/game-engine
 	go build -o $(BIN_GATEWAY) ./services/gateway
-	go build -o $(BIN_TERMINAL) ./cmd/terminal
+	go build -o $(BIN_TERMINAL) ./cmd/terminal-tui
 	@echo "ok"
 
 build-wasm:
@@ -42,7 +42,7 @@ run-gateway:
 	go run ./services/gateway
 
 run-terminal:
-	go run ./cmd/terminal
+	go run ./cmd/terminal-tui
 
 clean:
 	rm -rf $(BIN_DIR) $(WASM_CLIENT)
