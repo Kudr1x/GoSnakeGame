@@ -492,6 +492,7 @@ type PlayerScore struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	PlayerName    string                 `protobuf:"bytes,1,opt,name=player_name,json=playerName,proto3" json:"player_name,omitempty"`
 	Score         int32                  `protobuf:"varint,2,opt,name=score,proto3" json:"score,omitempty"`
+	Rating        int32                  `protobuf:"varint,3,opt,name=rating,proto3" json:"rating,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -536,6 +537,13 @@ func (x *PlayerScore) GetPlayerName() string {
 func (x *PlayerScore) GetScore() int32 {
 	if x != nil {
 		return x.Score
+	}
+	return 0
+}
+
+func (x *PlayerScore) GetRating() int32 {
+	if x != nil {
+		return x.Rating
 	}
 	return 0
 }
@@ -947,11 +955,12 @@ const file_api_proto_snake_v1_snake_proto_rawDesc = "" +
 	"inviteLink\"Y\n" +
 	"\x15GetTopPlayersResponse\x12@\n" +
 	"\vtop_players\x18\x01 \x03(\v2\x1f.api.proto.snake.v1.PlayerScoreR\n" +
-	"topPlayers\"D\n" +
+	"topPlayers\"\\\n" +
 	"\vPlayerScore\x12\x1f\n" +
 	"\vplayer_name\x18\x01 \x01(\tR\n" +
 	"playerName\x12\x14\n" +
-	"\x05score\x18\x02 \x01(\x05R\x05score\"K\n" +
+	"\x05score\x18\x02 \x01(\x05R\x05score\x12\x16\n" +
+	"\x06rating\x18\x03 \x01(\x05R\x06rating\"K\n" +
 	"\x0fJoinGameRequest\x12\x1f\n" +
 	"\vplayer_name\x18\x01 \x01(\tR\n" +
 	"playerName\x12\x17\n" +

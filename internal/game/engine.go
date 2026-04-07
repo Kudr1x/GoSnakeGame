@@ -4,6 +4,7 @@ package game
 import (
 	"GoSnakeGame/internal/config"
 	"GoSnakeGame/internal/metrics"
+	"GoSnakeGame/internal/rating"
 	"math"
 	"math/rand"
 	"sync"
@@ -42,6 +43,7 @@ type PlayerInfo struct {
 	Dir       pb.Direction
 	BestScore int
 	SessionID int64
+	Rating    int
 }
 
 // IsAlive returns the alive status of the player.
@@ -122,6 +124,21 @@ func (p *PlayerInfo) SetSessionID(id int64) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.SessionID = id
+}
+
+// GetRating returns the rating of the player.
+func (p *PlayerInfo) GetRating() int {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	return p.Rating
+}
+
+// SetRating sets the rating of the player.
+func (p *PlayerInfo) SetRating(rating int) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.Rating = rating
 }
 
 const (
@@ -224,6 +241,7 @@ func (e *Engine) AddOrUpdatePlayer(name string) *PlayerInfo {
 			Alive:     true,
 			Dir:       spawn.dir,
 			SessionID: sessionID,
+			Rating:    rating.DefaultRating,
 		}
 		e.players[name] = p
 
@@ -320,6 +338,7 @@ func (e *Engine) GetTopPlayers() []*pb.PlayerScore {
 		scores = append(scores, &pb.PlayerScore{
 			PlayerName: p.Name,
 			Score:      int32(p.GetBestScore()), // #nosec G115 - score is unlikely to overflow int32
+			Rating:     int32(p.GetRating()),    // #nosec G115 - rating is unlikely to overflow int32
 		})
 	}
 
@@ -328,7 +347,9 @@ func (e *Engine) GetTopPlayers() []*pb.PlayerScore {
 
 // Run starts the game loop.
 func (e *Engine) Run(onPlayerDie func(name string)) {
-	ticker := time.NewTicker(e.cfg.UpdateInterval)
+	updateInterval := e.cfg.GetUpdateInterval(int(e.mode))
+	ticker := time.NewTicker(updateInterval)
+
 	defer ticker.Stop()
 
 	for {
@@ -399,6 +420,9 @@ func (e *Engine) checkWinCondition(onPlayerDie func(name string)) bool {
 
 	// Win condition for multiplayer
 	if e.mode != pb.GameMode_MODE_SOLO && aliveCount <= 1 {
+		// Update ratings before ending game
+		e.updateRatings()
+
 		for _, p := range e.players {
 			if p.IsAlive() {
 				p.SetAlive(false)
@@ -413,6 +437,55 @@ func (e *Engine) checkWinCondition(onPlayerDie func(name string)) bool {
 	}
 
 	return false
+}
+
+// updateRatings updates player ratings based on game results.
+func (e *Engine) updateRatings() {
+	players := make([]*PlayerInfo, 0, len(e.players))
+	for _, p := range e.players {
+		players = append(players, p)
+	}
+
+	// Sort by score (descending) to determine positions
+	sortByScore(players)
+
+	if e.mode == pb.GameMode_MODE_1V1 && len(players) == 2 {
+		// 1v1: simple ELO calculation
+		player1Won := players[0].GetBestScore() > players[1].GetBestScore()
+		newRating1, newRating2 := rating.CalculateELO(
+			players[0].GetRating(),
+			players[1].GetRating(),
+			player1Won,
+		)
+		players[0].SetRating(newRating1)
+		players[1].SetRating(newRating2)
+	} else if e.mode == pb.GameMode_MODE_FFA && len(players) > 2 {
+		// FFA: multiplayer ELO calculation
+		ratings := make([]int, len(players))
+		positions := make([]int, len(players))
+
+		for i, p := range players {
+			ratings[i] = p.GetRating()
+			positions[i] = i + 1 // 1st, 2nd, 3rd, 4th
+		}
+
+		newRatings := rating.CalculateMultiplayerELO(ratings, positions)
+
+		for i, p := range players {
+			p.SetRating(newRatings[i])
+		}
+	}
+}
+
+// sortByScore sorts players by their best score in descending order.
+func sortByScore(players []*PlayerInfo) {
+	for i := 0; i < len(players)-1; i++ {
+		for j := i + 1; j < len(players); j++ {
+			if players[i].GetBestScore() < players[j].GetBestScore() {
+				players[i], players[j] = players[j], players[i]
+			}
+		}
+	}
 }
 
 func (e *Engine) getNewHead(p *PlayerInfo) *pb.Point {

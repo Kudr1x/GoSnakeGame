@@ -10,17 +10,20 @@ import (
 
 // ServerConfig defines the server-side configuration.
 type ServerConfig struct {
-	Addr            string        `envconfig:"ADDR" default:":50051"`
-	WebAddr         string        `envconfig:"WEB_ADDR" default:":8080"`
-	Width           int           `envconfig:"WIDTH" default:"20"`
-	Height          int           `envconfig:"HEIGHT" default:"20"`
-	UpdateInterval  time.Duration `envconfig:"UPDATE_INTERVAL" default:"150ms"`
-	SendInterval    time.Duration `envconfig:"SEND_INTERVAL" default:"100ms"`
-	DeathWaitTime   time.Duration `envconfig:"DEATH_WAIT_TIME" default:"200ms"`
-	MaxFoodAttempts int           `envconfig:"MAX_FOOD_ATTEMPTS" default:"100"`
-	TopPlayersLimit int           `envconfig:"TOP_PLAYERS_LIMIT" default:"10"`
-	ScoreMultiplier int           `envconfig:"SCORE_MULTIPLIER" default:"10"`
-	MetricsAddr     string        `envconfig:"METRICS_ADDR" default:":9090"`
+	Addr               string        `envconfig:"ADDR" default:":50051"`
+	WebAddr            string        `envconfig:"WEB_ADDR" default:":8080"`
+	Width              int           `envconfig:"WIDTH" default:"20"`
+	Height             int           `envconfig:"HEIGHT" default:"20"`
+	UpdateInterval     time.Duration `envconfig:"UPDATE_INTERVAL" default:"150ms"`
+	UpdateIntervalSolo time.Duration `envconfig:"UPDATE_INTERVAL_SOLO" default:"120ms"`
+	UpdateInterval1v1  time.Duration `envconfig:"UPDATE_INTERVAL_1V1" default:"130ms"`
+	UpdateIntervalFFA  time.Duration `envconfig:"UPDATE_INTERVAL_FFA" default:"150ms"`
+	SendInterval       time.Duration `envconfig:"SEND_INTERVAL" default:"100ms"`
+	DeathWaitTime      time.Duration `envconfig:"DEATH_WAIT_TIME" default:"200ms"`
+	MaxFoodAttempts    int           `envconfig:"MAX_FOOD_ATTEMPTS" default:"100"`
+	TopPlayersLimit    int           `envconfig:"TOP_PLAYERS_LIMIT" default:"10"`
+	ScoreMultiplier    int           `envconfig:"SCORE_MULTIPLIER" default:"10"`
+	MetricsAddr        string        `envconfig:"METRICS_ADDR" default:":9090"`
 }
 
 // ClientConfig defines the client-side configuration.
@@ -57,6 +60,26 @@ func (c *ServerConfig) ParseFlags(fs *flag.FlagSet) {
 	fs.StringVar(&c.MetricsAddr, "metrics-addr", c.MetricsAddr, "metrics server address")
 	fs.IntVar(&c.Width, "width", c.Width, "game width")
 	fs.IntVar(&c.Height, "height", c.Height, "game height")
+}
+
+// GetUpdateInterval returns the update interval for the given game mode.
+func (c *ServerConfig) GetUpdateInterval(mode int) time.Duration {
+	const (
+		modeSolo = 1
+		mode1v1  = 2
+		modeFFA  = 3
+	)
+
+	switch mode {
+	case modeSolo:
+		return c.UpdateIntervalSolo
+	case mode1v1:
+		return c.UpdateInterval1v1
+	case modeFFA:
+		return c.UpdateIntervalFFA
+	default:
+		return c.UpdateInterval
+	}
 }
 
 // DefaultClientConfig returns the default client configuration.
